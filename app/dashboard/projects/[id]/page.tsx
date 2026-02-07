@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Header } from "@/components/layout/header";
 import { ParsingProgress } from "@/components/parsing/parsing-progress";
 import { TokenSection } from "@/components/tokens/token-section";
@@ -9,6 +9,9 @@ import { ColorPalette } from "@/components/tokens/color-palette";
 import { TypographyScale } from "@/components/tokens/typography-scale";
 import { SpacingScale } from "@/components/tokens/spacing-scale";
 import { Toast } from "@/components/ui/toast";
+import type { ParseResult } from "@/lib/parser";
+import { parseGithubThemeFiles } from "@/lib/parser/github";
+import { readStoredTokens } from "@/lib/parser/storage";
 
 const colorGroups = [
   {
@@ -48,9 +51,14 @@ const spacingTokens = [
 ];
 
 export default function ProjectDetailPage() {
+  const router = useRouter();
   const [toast, setToast] = useState<string | null>(null);
+  const [parsed, setParsed] = useState<ParseResult | null>(null);
+  const [parseError, setParseError] = useState<string | null>(null);
+  const [step, setStep] = useState(0);
   const searchParams = useSearchParams();
   const state = searchParams.get("state") ?? "ready";
+  const repoFullName = searchParams.get("repo") ?? "sebastian/memento-app";
 
   const showToast = (message: string) => setToast(message);
   const handleCopy = async (value: string) => {
@@ -60,20 +68,94 @@ export default function ProjectDetailPage() {
     showToast(`Copied ${value}`);
   };
 
+  useEffect(() => {
+    if (state !== "parsing") return;
+    let mounted = true;
+    const run = async () => {
+      try {
+        setParseError(null);
+        setStep(0);
+        await new Promise((resolve) => setTimeout(resolve, 150));
+        if (!mounted) return;
+        setStep(1);
+        const result = await parseGithubThemeFiles(repoFullName);
+        if (!mounted) return;
+        setStep(3);
+        setParsed(result);
+        localStorage.setItem("autodsm:tokens", JSON.stringify(result));
+        setStep(4);
+        const hasTokens = result.colors.length > 0 || result.typography.length > 0;
+        router.replace(
+          `/dashboard/projects/${repoFullName.replace(/\\W+/g, "-")}?repo=${encodeURIComponent(
+            repoFullName,
+          )}${hasTokens ? "" : "&state=tokens-empty"}`,
+        );
+      } catch (error) {
+        if (!mounted) return;
+        setParseError(error instanceof Error ? error.message : "Failed to parse repo");
+      }
+    };
+    run();
+    return () => {
+      mounted = false;
+    };
+  }, [repoFullName, state]);
+
+  useEffect(() => {
+    if (state === "parsing") return;
+    if (parsed) return;
+    const stored = readStoredTokens();
+    if (stored) setParsed(stored);
+  }, [parsed, state]);
+
+  const fallbackColors = colorGroups.flatMap((group) =>
+    group.tokens.map((token) => ({
+      ...token,
+      category: group.title.toLowerCase(),
+    })),
+  );
+  const colors = (parsed?.colors ?? fallbackColors).map((color) => ({
+    ...color,
+    category: color.category ?? null,
+  }));
+  const typography = parsed?.typography ?? typographyTokens;
+
+  const groupedColors = colors.reduce<Record<string, typeof colors>>((acc, color) => {
+    const category = color.category || "other";
+    if (!acc[category]) acc[category] = [];
+    acc[category].push(color);
+    return acc;
+  }, {});
+
   return (
     <div className="space-y-8">
       <Header
-        title="memento-app"
-        subtitle="github.com/sebastian/memento-app · Last synced 2 minutes ago"
+        title={repoFullName.split("/")[1] ?? "memento-app"}
+        subtitle={`github.com/${repoFullName} · Last synced 2 minutes ago`}
         actionLabel="Sync"
       />
 
       {state === "parsing" ? (
-        <ParsingProgress repoFullName="sebastian/memento-app" currentStep={2} />
+        parseError ? (
+          <div className="space-y-6">
+            <ParsingProgress repoFullName={repoFullName} currentStep={step} errorStep={step} />
+            <section className="rounded-2xl border border-border bg-background-elevated p-8 text-center">
+              <h2 className="text-lg font-semibold">Something went wrong</h2>
+              <p className="mt-2 text-sm text-foreground-secondary">
+                {parseError}
+              </p>
+              <div className="mt-6 flex justify-center">
+                <button className="btn-primary">Try Again</button>
+              </div>
+            </section>
+          </div>
+        ) : (
+          <ParsingProgress repoFullName={repoFullName} currentStep={step} />
+        )
       ) : state === "parsing-error" ? (
         <div className="space-y-6">
           <ParsingProgress
-            repoFullName="sebastian/memento-app"
+            repoFullName={repoFullName}
             currentStep={2}
             errorStep={2}
           />
@@ -90,7 +172,7 @@ export default function ProjectDetailPage() {
       ) : state === "tokens-empty" ? (
         <div className="space-y-6">
           <ParsingProgress
-            repoFullName="sebastian/memento-app"
+            repoFullName={repoFullName}
             currentStep={3}
             errorStep={3}
           />
@@ -131,18 +213,25 @@ export default function ProjectDetailPage() {
       ) : (
         <div className="space-y-6">
           <TokenSection title="Colors" count={24}>
-            {colorGroups.map((group) => (
-              <ColorPalette
-                key={group.title}
-                title={group.title}
-                tokens={group.tokens}
-                onCopy={handleCopy}
-              />
+            {Object.entries(groupedColors).map(([title, tokens]) => (
+              <ColorPalette key={title} title={title} tokens={tokens} onCopy={handleCopy} />
             ))}
           </TokenSection>
 
           <TokenSection title="Typography" count={8}>
-            <TypographyScale tokens={typographyTokens} onCopy={handleCopy} />
+            <TypographyScale
+              tokens={typography.map((token) => {
+                const sizeMatch = token.value.match(/\d+(?:\.\d+)?(px|rem|em)/);
+                const isSize = Boolean(sizeMatch);
+                return {
+                  name: token.name,
+                  value: token.value,
+                  size: isSize ? token.value : "16px",
+                  fontFamily: isSize ? undefined : token.value,
+                };
+              })}
+              onCopy={handleCopy}
+            />
           </TokenSection>
 
           <TokenSection title="Spacing" count={12}>

@@ -3,11 +3,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 const repos = [
   {
-    name: "memento-app",
-    visibility: "Private" as const,
-    updated: "Updated 2 days ago",
-  },
-  {
     name: "portfolio-site",
     visibility: "Public" as const,
     updated: "Updated 1 week ago",
@@ -44,7 +39,7 @@ export function RepoList({ selectedRepo, onSelect, state = "ready" }: RepoListPr
       <div className="rounded-lg border border-border bg-background px-4 py-6 text-center">
         <p className="text-sm font-medium">No repositories found</p>
         <p className="mt-1 text-xs text-foreground-tertiary">
-          We couldn&apos;t find any repositories in your GitHub account.
+          We couldn&apos;t find any public repositories in your GitHub account.
         </p>
       </div>
     );

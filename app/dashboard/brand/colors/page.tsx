@@ -1,4 +1,12 @@
-const colorRows = [
+"use client";
+
+import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import type { ColorToken, ParseResult } from "@/lib/parser";
+import { readStoredTokens } from "@/lib/parser/storage";
+import { extractColorsFromRepo } from "@/lib/github/fetcher";
+
+const fallbackRows = [
   {
     label: "Primary",
     swatches: [
@@ -36,6 +44,50 @@ const colorRows = [
 ];
 
 export default function ColorsPage() {
+  const [tokens, setTokens] = useState<ParseResult | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const searchParams = useSearchParams();
+  const state = searchParams.get("state");
+  const repo = searchParams.get("repo");
+
+  useEffect(() => {
+    setTokens(readStoredTokens());
+  }, []);
+
+  useEffect(() => {
+    if (state !== "parsing" || !repo) return;
+    let mounted = true;
+    const run = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const results = await extractColorsFromRepo(repo);
+        if (!mounted) return;
+        const merged = results.flatMap((entry) => entry.colors);
+        const deduped = dedupeColors(merged);
+        const payload: ParseResult = { colors: deduped, typography: [] };
+        setTokens(payload);
+        localStorage.setItem("autodsm:tokens", JSON.stringify(payload));
+        localStorage.setItem("autodsm:lastRepo", repo);
+      } catch (err) {
+        if (!mounted) return;
+        setError(err instanceof Error ? err.message : "Failed to parse repo");
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    };
+    run();
+    return () => {
+      mounted = false;
+    };
+  }, [repo, state]);
+
+  const colorList: ColorToken[] = tokens?.colors ?? [];
+  const displayColors = colorList.length > 0 ? colorList : [];
+  const fallbackCount = fallbackRows.reduce((sum, row) => sum + row.swatches.length, 0);
+  const colorCount = displayColors.length > 0 ? displayColors.length : fallbackCount;
+
   return (
     <div className="space-y-6">
       <header>
@@ -44,25 +96,65 @@ export default function ColorsPage() {
       </header>
 
       <section className="rounded-2xl border border-border bg-background-elevated p-6">
-        <div className="space-y-6">
-          {colorRows.map((row) => (
-            <div key={row.label} className="space-y-3">
-              <h3 className="text-sm font-semibold text-foreground">{row.label}</h3>
-              <div className="flex flex-wrap gap-3">
-                {row.swatches.map((color) => (
-                  <div key={color} className="flex flex-col items-center gap-2">
-                    <div
-                      className="h-14 w-14 rounded-2xl border border-border"
-                      style={{ backgroundColor: color }}
-                    />
-                    <span className="text-xs text-foreground-tertiary">{color}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ))}
+        <div className="mb-4 flex items-center justify-between">
+          <p className="text-sm text-foreground-secondary">
+            {loading ? "Parsing colors..." : `${colorCount} colors`}
+          </p>
+          {repo ? (
+            <span className="text-xs text-foreground-tertiary">Source: {repo}</span>
+          ) : null}
         </div>
+        {loading ? (
+          <div className="rounded-xl border border-border bg-background px-6 py-10 text-center">
+            <p className="text-sm text-foreground-secondary">Parsing colors...</p>
+          </div>
+        ) : error ? (
+          <div className="rounded-xl border border-border bg-background px-6 py-10 text-center">
+            <p className="text-sm text-foreground-secondary">{error}</p>
+          </div>
+        ) : displayColors.length === 0 ? (
+          <div className="rounded-xl border border-border bg-background px-6 py-10 text-center">
+            <p className="text-sm font-medium">No colors found</p>
+            <p className="mt-2 text-xs text-foreground-tertiary">
+              No CSS color tokens were detected. Check the repo path or file patterns.
+            </p>
+          </div>
+        ) : (
+        <div className="space-y-2">
+          {displayColors.map((color, index) => (
+                <div
+                  key={`${color.name}-${index}`}
+                  className="flex items-center gap-4 rounded-lg border border-border bg-background px-4 py-3"
+                >
+                  <div
+                    className="h-10 w-10 rounded-lg border border-border"
+                    style={{ backgroundColor: color.value }}
+                  />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium">{color.name || color.value}</p>
+                    <p className="text-xs text-foreground-tertiary">
+                      {color.category ? color.category : "uncategorized"}
+                    </p>
+                  </div>
+                  <span className="text-xs font-mono text-foreground-tertiary">
+                    {color.value}
+                  </span>
+                </div>
+              ))}
+        </div>
+        )}
       </section>
     </div>
   );
+}
+
+function dedupeColors(colors: ColorToken[]) {
+  const seen = new Map<string, ColorToken>();
+  for (const color of colors) {
+    const key = `${color.name}:${color.value}`;
+    if (!seen.has(key)) {
+      seen.set(key, color);
+    }
+  }
+  return Array.from(seen.values());
 }

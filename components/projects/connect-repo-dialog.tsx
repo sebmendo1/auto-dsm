@@ -19,7 +19,7 @@ export function ConnectRepoDialog({ open, onClose }: { open: boolean; onClose: (
       open={open}
       onClose={onClose}
       title="Connect Repository"
-      description="Select a repository to analyze for design tokens."
+      description="Select a public repository to analyze for design tokens."
     >
       <div className="space-y-4">
         <input

@@ -2,7 +2,7 @@
 
 import { TypographySample } from "@/components/tokens/typography-sample";
 
-type TypographyToken = { name: string; value: string; size: string };
+type TypographyToken = { name: string; value: string; size: string; fontFamily?: string };
 
 type TypographyScaleProps = {
   tokens: TypographyToken[];
@@ -18,6 +18,7 @@ export function TypographyScale({ tokens, onCopy }: TypographyScaleProps) {
           name={token.name}
           value={token.value}
           size={token.size}
+          fontFamily={token.fontFamily}
           onCopy={onCopy}
         />
       ))}
