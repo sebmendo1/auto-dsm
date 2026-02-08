@@ -66,15 +66,20 @@ function findComponentDirectories(filePaths: string[]): string[] {
 
 function extractComponents(allPaths: string[], componentDirs: string[]): DiscoveredComponent[] {
   const components: DiscoveredComponent[] = [];
-  const seen = new Set<string>();
+  const slugCounts = new Map<string, number>();
 
   for (const dir of componentDirs) {
     const componentFiles = allPaths.filter((path) => path.startsWith(dir));
 
     for (const filePath of componentFiles) {
       const component = parseComponentFile(filePath, dir);
-      if (component && !seen.has(component.slug)) {
-        seen.add(component.slug);
+      if (component) {
+        const baseSlug = component.slug;
+        const existingCount = slugCounts.get(baseSlug) ?? 0;
+        if (existingCount > 0) {
+          component.slug = `${baseSlug}-${existingCount + 1}`;
+        }
+        slugCounts.set(baseSlug, existingCount + 1);
         components.push(component);
       }
     }

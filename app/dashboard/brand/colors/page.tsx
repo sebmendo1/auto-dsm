@@ -6,43 +6,6 @@ import type { ColorToken, ParseResult } from "@/lib/parser";
 import { readStoredTokens } from "@/lib/parser/storage";
 import { extractColorsFromRepo } from "@/lib/github/fetcher";
 
-const fallbackRows = [
-  {
-    label: "Primary",
-    swatches: [
-      "#0b3bdb",
-      "#0b38d0",
-      "#0b34c4",
-      "#0b30b8",
-      "#0b2cab",
-      "#0b289f",
-      "#0b2493",
-      "#0b2087",
-    ],
-  },
-  {
-    label: "Secondary",
-    swatches: [
-      "#e6e6e6",
-      "#cfcfcf",
-      "#b8b8b8",
-      "#a1a1a1",
-      "#8a8a8a",
-      "#737373",
-      "#5c5c5c",
-      "#454545",
-    ],
-  },
-  {
-    label: "Text",
-    swatches: ["#d4d4d4", "#a3a3a3", "#737373", "#525252", "#3f3f3f"],
-  },
-  {
-    label: "Borders",
-    swatches: ["#404040", "#353535", "#2a2a2a", "#202020", "#161616"],
-  },
-];
-
 export default function ColorsPage() {
   const [tokens, setTokens] = useState<ParseResult | null>(null);
   const [loading, setLoading] = useState(false);
@@ -83,10 +46,8 @@ export default function ColorsPage() {
     };
   }, [repo, state]);
 
-  const colorList: ColorToken[] = tokens?.colors ?? [];
-  const displayColors = colorList.length > 0 ? colorList : [];
-  const fallbackCount = fallbackRows.reduce((sum, row) => sum + row.swatches.length, 0);
-  const colorCount = displayColors.length > 0 ? displayColors.length : fallbackCount;
+  const displayColors: ColorToken[] = tokens?.colors ?? [];
+  const colorCount = displayColors.length;
 
   return (
     <div className="space-y-6">
@@ -120,8 +81,8 @@ export default function ColorsPage() {
             </p>
           </div>
         ) : (
-        <div className="space-y-2">
-          {displayColors.map((color, index) => (
+          <div className="space-y-2">
+            {displayColors.map((color, index) => (
                 <div
                   key={`${color.name}-${index}`}
                   className="flex items-center gap-4 rounded-lg border border-border bg-background px-4 py-3"
@@ -140,8 +101,8 @@ export default function ColorsPage() {
                     {color.value}
                   </span>
                 </div>
-              ))}
-        </div>
+            ))}
+          </div>
         )}
       </section>
     </div>

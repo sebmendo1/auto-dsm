@@ -212,13 +212,13 @@ export default function ProjectDetailPage() {
         </section>
       ) : (
         <div className="space-y-6">
-          <TokenSection title="Colors" count={24}>
+          <TokenSection title="Colors" count={colors.length}>
             {Object.entries(groupedColors).map(([title, tokens]) => (
               <ColorPalette key={title} title={title} tokens={tokens} onCopy={handleCopy} />
             ))}
           </TokenSection>
 
-          <TokenSection title="Typography" count={8}>
+          <TokenSection title="Typography" count={typography.length}>
             <TypographyScale
               tokens={typography.map((token) => {
                 const sizeMatch = token.value.match(/\d+(?:\.\d+)?(px|rem|em)/);
@@ -234,7 +234,7 @@ export default function ProjectDetailPage() {
             />
           </TokenSection>
 
-          <TokenSection title="Spacing" count={12}>
+          <TokenSection title="Spacing" count={spacingTokens.length}>
             <SpacingScale tokens={spacingTokens} onCopy={handleCopy} />
           </TokenSection>
         </div>

@@ -1,14 +1,9 @@
 import type { ParseResult } from "./types";
-import { autoDetectAndParse, parseCSSVariables, parseTailwindConfig } from "./index";
+import { extractColorsFromRepo, extractTypographyFromRepo } from "@/lib/github/fetcher";
 
 type RepoInfo = {
   owner: string;
   repo: string;
-};
-
-type GithubTreeItem = {
-  path: string;
-  type: "blob" | "tree";
 };
 
 export function parseRepoUrl(input: string): RepoInfo | null {
@@ -29,89 +24,43 @@ export function parseRepoUrl(input: string): RepoInfo | null {
   return null;
 }
 
-async function fetchDefaultBranch(owner: string, repo: string): Promise<string> {
-  const res = await fetch(`https://api.github.com/repos/${owner}/${repo}`);
-  if (!res.ok) throw new Error("Failed to fetch repo info");
-  const data = await res.json();
-  return data.default_branch ?? "main";
-}
-
-async function fetchRepoTree(
-  owner: string,
-  repo: string,
-  branch: string,
-): Promise<GithubTreeItem[]> {
-  const res = await fetch(
-    `https://api.github.com/repos/${owner}/${repo}/git/trees/${branch}?recursive=1`,
-  );
-  if (!res.ok) throw new Error("Failed to fetch repo tree");
-  const data = await res.json();
-  return (data.tree ?? []) as GithubTreeItem[];
-}
-
-async function fetchRawFile(
-  owner: string,
-  repo: string,
-  branch: string,
-  path: string,
-): Promise<string> {
-  const res = await fetch(
-    `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${path}`,
-  );
-  if (!res.ok) throw new Error(`Failed to fetch file ${path}`);
-  return res.text();
-}
-
-function isThemeFile(path: string): boolean {
-  const lower = path.toLowerCase();
-  return /(theme|tokens|colors?)\.(js|ts|tsx|mjs|cjs)$/.test(lower);
-}
-
-function isTailwindConfig(path: string): boolean {
-  return /tailwind\.config\.(js|ts|mjs|cjs)$/.test(path.toLowerCase());
-}
-
-function isGlobalsCss(path: string): boolean {
-  return /globals\.css$/.test(path.toLowerCase());
-}
-
-function selectCandidateFiles(tree: GithubTreeItem[]): GithubTreeItem[] {
-  const blobs = tree.filter((item) => item.type === "blob");
-  const themes = blobs.filter((item) => isThemeFile(item.path));
-  if (themes.length > 0) return themes;
-
-  const tailwind = blobs.filter((item) => isTailwindConfig(item.path));
-  if (tailwind.length > 0) return tailwind;
-
-  const globals = blobs.filter((item) => isGlobalsCss(item.path));
-  return globals;
-}
-
 export async function parseGithubThemeFiles(repoInput: string): Promise<ParseResult> {
   const info = parseRepoUrl(repoInput);
   if (!info) throw new Error("Invalid GitHub repo link");
+  const repoFullName = `${info.owner}/${info.repo}`;
 
-  const branch = await fetchDefaultBranch(info.owner, info.repo);
-  const tree = await fetchRepoTree(info.owner, info.repo, branch);
-  const candidates = selectCandidateFiles(tree);
+  const colorResults = await extractColorsFromRepo(repoFullName);
+  const typographyResults = await extractTypographyFromRepo(repoFullName);
 
-  if (candidates.length === 0) {
-    return { colors: [], typography: [] };
+  const colors = dedupeColors(colorResults.flatMap((entry) => entry.colors));
+  const typography = dedupeTypography(
+    typographyResults.flatMap((entry) => entry.typography),
+  );
+
+  return { colors, typography };
+}
+
+function dedupeColors(colors: Array<{ name: string; value: string; category: string | null }>) {
+  const seen = new Map<string, { name: string; value: string; category: string | null }>();
+  for (const color of colors) {
+    const key = `${color.name}:${color.value}`.toLowerCase();
+    if (!seen.has(key)) seen.set(key, color);
   }
+  return Array.from(seen.values());
+}
 
-  const aggregate: ParseResult = { colors: [], typography: [] };
-
-  for (const file of candidates.slice(0, 5)) {
-    const content = await fetchRawFile(info.owner, info.repo, branch, file.path);
-    const result =
-      file.path.endsWith(".css")
-        ? parseCSSVariables(content)
-        : isTailwindConfig(file.path)
-          ? parseTailwindConfig(content)
-          : autoDetectAndParse(content);
-    aggregate.colors.push(...result.colors);
-    aggregate.typography.push(...result.typography);
+function dedupeTypography(tokens: Array<{ name: string; value: string; lineHeight?: string }>) {
+  const seen = new Map<string, { name: string; value: string; lineHeight?: string }>();
+  for (const token of tokens) {
+    const key = `${token.name}:${token.value}`.toLowerCase();
+    if (!seen.has(key)) {
+      seen.set(key, token);
+      continue;
+    }
+    const existing = seen.get(key);
+    if (existing && !existing.lineHeight && token.lineHeight) {
+      existing.lineHeight = token.lineHeight;
+    }
   }
-
-  return aggregate;
+  return Array.from(seen.values());
 }

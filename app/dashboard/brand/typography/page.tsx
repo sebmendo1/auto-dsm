@@ -64,7 +64,7 @@ export default function TypographyPage() {
     return () => {
       mounted = false;
     };
-  }, [repo, repoToParse, state, tokens?.colors, tokens?.typography]);
+  }, [repo, repoToParse, state]);
 
   useEffect(() => {
     if (typeof document === "undefined") return;
@@ -93,7 +93,7 @@ export default function TypographyPage() {
   }, [fonts]);
 
   const typography = tokens?.typography ?? [];
-  const primaryFont = fonts[0]?.name ?? "Geist";
+  const primaryFont = fonts[0]?.name ?? "System";
   const fontStack = useMemo(() => {
     if (!primaryFont) return "var(--font-geist-sans), system-ui, sans-serif";
     return `"${primaryFont}", var(--font-geist-sans), system-ui, sans-serif`;
@@ -128,6 +128,8 @@ export default function TypographyPage() {
     if (weight >= 500) return "Medium";
     return "Regular";
   };
+  const targetRepo = repo ?? repoToParse;
+  const hasContent = typography.length > 0 || fonts.length > 0;
 
   return (
     <div className="space-y-6">
@@ -144,7 +146,14 @@ export default function TypographyPage() {
         <div className="rounded-2xl border border-border bg-background-elevated px-6 py-10 text-center">
           <p className="text-sm text-foreground-secondary">{error}</p>
         </div>
-      ) : typography.length === 0 && fonts.length === 0 ? (
+      ) : !targetRepo && !hasContent ? (
+        <div className="rounded-2xl border border-border bg-background-elevated px-6 py-10 text-center">
+          <p className="text-sm font-medium">No typography data yet</p>
+          <p className="mt-2 text-xs text-foreground-tertiary">
+            Connect a repository to extract your typography tokens.
+          </p>
+        </div>
+      ) : !hasContent ? (
         <div className="rounded-2xl border border-border bg-background-elevated px-6 py-10 text-center">
           <p className="text-sm font-medium">No typography tokens found</p>
           <p className="mt-2 text-xs text-foreground-tertiary">
