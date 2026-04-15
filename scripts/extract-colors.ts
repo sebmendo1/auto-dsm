@@ -1,4 +1,4 @@
-import { extractColorsFromRepo } from "@/lib/github/fetcher";
+import { extractColorsFromRepo } from "../src/lib/github/fetcher";
 
 const repo = process.argv[2];
 const json = process.argv.includes("--json");

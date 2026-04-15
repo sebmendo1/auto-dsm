@@ -1,4 +1,4 @@
-import { extractTypographyFromRepo } from "@/lib/github/fetcher";
+import { extractTypographyFromRepo } from "../src/lib/github/fetcher";
 
 const repo = process.argv[2];
 const json = process.argv.includes("--json");
@@ -14,13 +14,28 @@ const run = async () => {
     r.typography.map((t) => ({ ...t, source: r.source })),
   );
   const fonts = results.flatMap((r) => r.fonts.map((f) => ({ ...f, source: r.source })));
+  const typographyRows = results.flatMap((r) => r.typographyRows ?? []);
 
   if (json) {
-    console.log(JSON.stringify({ total: typography.length, typography, fonts }, null, 2));
+    console.log(
+      JSON.stringify(
+        {
+          total: typography.length,
+          typographyRowsTotal: typographyRows.length,
+          typography,
+          typographyRows,
+          fonts,
+        },
+        null,
+        2,
+      ),
+    );
     return;
   }
 
-  console.log(`Found ${typography.length} typography tokens from ${results.length} file(s).`);
+  console.log(
+    `Found ${typography.length} typography tokens, ${typographyRows.length} merged row(s) from ${results.length} file(s).`,
+  );
   for (const token of typography) {
     console.log(`${token.name} = ${token.value} [${token.source}]`);
   }

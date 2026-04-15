@@ -1,6 +1,6 @@
-# AutoDSM UI Boilerplate
+# AutoDSM UI
 
-Vercel-ready Next.js App Router UI for an onboarding → token-visualization flow. This repo is frontend-only: no Supabase or GitHub wiring yet.
+Vite + React + TypeScript SPA for an onboarding → token-visualization flow. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for routes, APIs, and persistence.
 
 ## What’s Included
 
@@ -8,13 +8,15 @@ Vercel-ready Next.js App Router UI for an onboarding → token-visualization flo
 - Sidebar + canvas layout for brand guidelines and component previews
 - Modern parsing progress UI (vertical steps)
 - Click-to-copy with toast feedback
+- Express API on `/api` for GitHub component discovery and source fetch (same origin in production preview)
 
 ## Routes
 
 - `/` Landing page
 - `/login` Sign in screen (button routes to dashboard for now)
-- `/dashboard` Empty dashboard with connect dialog
-- `/dashboard/projects/[id]` Token display + states
+- `/dashboard` Overview (metrics, recent activity, connect repo) + light/dark theming
+- `/dashboard/settings` Appearance (light / dark / system)
+- `/dashboard/projects/:id` Token display + states
 - `/dashboard/brand/colors` Brand colors
 - `/dashboard/brand/typography` Typography scale
 - `/dashboard/components/buttons` Component previews (examples)
@@ -33,20 +35,31 @@ npm install
 npm run dev
 ```
 
-## Deploy to Vercel
+- Vite: [http://localhost:5173](http://localhost:5173)
+- API server: port `3001` (Vite proxies `/api` to it)
 
-- Push to GitHub
-- Import into Vercel
-- No special build settings needed
+## Production-style preview
+
+```bash
+npm run build
+npm run preview
+```
+
+Serves the built app and `/api` on [http://localhost:3000](http://localhost:3000) (override with `PORT`).
+
+## Deploy
+
+- **Static + API:** Run `npm run build` and host `dist/` plus the Express `server/` (or reimplement the two `/api` routes on your platform).
+- **Split:** Deploy `dist/` to any static host and run the API elsewhere; set the client `fetch` base URL accordingly (today the app uses relative `/api`).
 
 ## Environment Variables (Optional)
 
-Copy `.env.example` to `.env.local` and fill in values when you wire auth:
+Copy `.env.example` to `.env.local` when wiring auth:
 
-- `NEXT_PUBLIC_SUPABASE_URL`
-- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `VITE_SUPABASE_URL`
+- `VITE_SUPABASE_ANON_KEY`
 
 ## Notes
 
-- This UI is intentionally static; wire Supabase + GitHub later.
-- The parsing progress is a UI-only simulation right now.
+- The parsing progress on the project page includes a UI-only simulation path; GitHub theme parsing uses the public GitHub API from the browser where applicable.
+- Component discovery uses Octokit on the server (`server/index.ts`).

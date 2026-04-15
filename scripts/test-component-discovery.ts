@@ -1,4 +1,4 @@
-import { discoverComponents } from "../lib/github/component-discovery";
+import { discoverComponents } from "../src/lib/github/component-discovery";
 
 interface RepoItem {
   full_name: string;
