@@ -1,11 +1,6 @@
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
-import { useSearchParams } from "react-router-dom";
 import type { ParseResult, TypographyStyleRow } from "@/lib/parser";
 import { readStoredTokens } from "@/lib/parser/storage";
-import { dedupeTypographyRows } from "@/lib/parser/typography-style-rows";
-import { extractTypographyFromRepo } from "@/lib/github/fetcher";
-import { isDemoRepo } from "@/lib/demo/demo-mode";
-import { notifyAppDataUpdated } from "@/lib/app-events";
 
 const PREVIEW_SAMPLE = "the fox jumped over the lazy dog";
 
@@ -63,78 +58,23 @@ function previewStyleFromRepoRow(row: TypographyStyleRow): CSSProperties {
 export function BrandTypographyPage() {
   const [tokens, setTokens] = useState<ParseResult | null>(null);
   const [fonts, setFonts] = useState<{ name: string; openSource: boolean; source: string }[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [searchParams] = useSearchParams();
-  const state = searchParams.get("state");
-  const repo = searchParams.get("repo");
-  const [repoToParse, setRepoToParse] = useState<string | null>(null);
+  const [loading] = useState(false);
+  const [error] = useState<string | null>(null);
 
   useEffect(() => {
-    setTokens(readStoredTokens());
-    if (typeof window !== "undefined") {
-      const storedFonts = localStorage.getItem("autodsm:fonts");
-      if (storedFonts) {
-        try {
-          setFonts(JSON.parse(storedFonts));
-        } catch {
-          // ignore parse errors
-        }
-      }
-      const storedRepo = localStorage.getItem("autodsm:lastRepo");
-      if (storedRepo) setRepoToParse(storedRepo);
-    }
-  }, []);
-
-  useEffect(() => {
-    const targetRepo = repo ?? repoToParse;
-    if (isDemoRepo(targetRepo) && state !== "parsing") return;
-    const stored = readStoredTokens();
-    const legacyTokensWithoutRows =
-      stored != null &&
-      stored.typographyRows === undefined &&
-      (stored.typography?.length ?? 0) > 0;
-    const shouldParse =
-      Boolean(targetRepo) &&
-      (state === "parsing" ||
-        (((stored?.typography ?? []).length === 0 && (stored?.typographyRows ?? []).length === 0) ||
-          legacyTokensWithoutRows));
-    if (!shouldParse || !targetRepo) return;
-    let mounted = true;
-    const run = async () => {
+    const load = () => {
+      setTokens(readStoredTokens());
       try {
-        setLoading(true);
-        setError(null);
-        const results = await extractTypographyFromRepo(targetRepo);
-        if (!mounted) return;
-        const merged = dedupeTypography(results.flatMap((entry) => entry.typography));
-        const mergedFonts = dedupeFonts(results.flatMap((entry) => entry.fonts));
-        const mergedRows = dedupeTypographyRows(results.flatMap((entry) => entry.typographyRows ?? []));
-        const prev = readStoredTokens();
-        const payload: ParseResult = {
-          colors: prev?.colors ?? [],
-          typography: merged,
-          typographyRows: mergedRows,
-          assets: prev?.assets ?? [],
-        };
-        setTokens(payload);
-        setFonts(mergedFonts);
-        localStorage.setItem("autodsm:tokens", JSON.stringify(payload));
-        localStorage.setItem("autodsm:fonts", JSON.stringify(mergedFonts));
-        localStorage.setItem("autodsm:lastRepo", targetRepo);
-        notifyAppDataUpdated();
-      } catch (err) {
-        if (!mounted) return;
-        setError(err instanceof Error ? err.message : "Failed to parse typography");
-      } finally {
-        if (mounted) setLoading(false);
+        const storedFonts = localStorage.getItem("autodsm:fonts");
+        if (storedFonts) setFonts(JSON.parse(storedFonts));
+      } catch {
+        // ignore
       }
     };
-    run();
-    return () => {
-      mounted = false;
-    };
-  }, [repo, repoToParse, state]);
+    load();
+    window.addEventListener("autodsm:updated", load);
+    return () => window.removeEventListener("autodsm:updated", load);
+  }, []);
 
   useEffect(() => {
     if (typeof document === "undefined") return;
@@ -210,7 +150,6 @@ export function BrandTypographyPage() {
     ? scale.filter((row) => !isHeadingLabel(row.label))
     : [];
 
-  const targetRepo = repo ?? repoToParse;
   const hasContent =
     typography.length > 0 ||
     fonts.length > 0 ||
@@ -243,7 +182,7 @@ export function BrandTypographyPage() {
           <div className="py-12 text-center">
             <p className="text-sm text-foreground-secondary">{error}</p>
           </div>
-        ) : !targetRepo && !hasContent ? (
+        ) : !hasContent ? (
           <div className="py-12 text-center">
             <p className="text-sm font-medium text-foreground">No typography data yet</p>
             <p className="mt-2 text-sm text-foreground-secondary">
@@ -495,29 +434,3 @@ export function BrandTypographyPage() {
   );
 }
 
-function dedupeFonts(
-  fonts: { name: string; openSource: boolean; source: string }[],
-) {
-  const seen = new Map<string, { name: string; openSource: boolean; source: string }>();
-  for (const font of fonts) {
-    const key = font.name.toLowerCase();
-    if (!seen.has(key)) seen.set(key, font);
-  }
-  return Array.from(seen.values());
-}
-
-function dedupeTypography(tokens: { name: string; value: string; lineHeight?: string }[]) {
-  const seen = new Map<string, { name: string; value: string; lineHeight?: string }>();
-  for (const token of tokens) {
-    const key = `${token.name}:${token.value}`.toLowerCase();
-    if (!seen.has(key)) {
-      seen.set(key, token);
-      continue;
-    }
-    const existing = seen.get(key);
-    if (existing && !existing.lineHeight && token.lineHeight) {
-      existing.lineHeight = token.lineHeight;
-    }
-  }
-  return Array.from(seen.values());
-}

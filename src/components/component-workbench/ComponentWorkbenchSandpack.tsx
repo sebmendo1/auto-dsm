@@ -1,9 +1,9 @@
-import { useMemo } from "react";
-import { SandpackPreview, SandpackProvider } from "@codesandbox/sandpack-react";
+import { useEffect, useMemo, useRef } from "react";
+import { SandpackPreview, SandpackProvider, useSandpack } from "@codesandbox/sandpack-react";
 import { githubLight, sandpackDark } from "@codesandbox/sandpack-themes";
 import { useTheme } from "@/theme/ThemeProvider";
 import type { TsPathsConfig } from "@/lib/github/tsconfig-paths";
-import { buildSandpackFiles } from "@/lib/sandpack/build-sandpack-files";
+import { buildSandpackFiles, buildAppEntrySource } from "@/lib/sandpack/build-sandpack-files";
 import type { WorkbenchPreviewPrefs } from "@/lib/sandpack/workbench-preferences";
 
 export type SandpackWorkbenchPayload = {
@@ -17,7 +17,45 @@ export type SandpackWorkbenchPayload = {
   globalCssRepoPaths?: string[];
   useTailwindInPreview?: boolean;
   sandpackPathContext?: TsPathsConfig;
+  propValues?: Record<string, string | boolean>;
 };
+
+/** Inner component that hot-patches App.tsx when propValues change (avoids remounting SandpackProvider). */
+function SandpackPropPatcher({
+  payload,
+}: {
+  payload: SandpackWorkbenchPayload;
+}) {
+  const { sandpack } = useSandpack();
+  const prevPropsRef = useRef(payload.propValues);
+
+  useEffect(() => {
+    // Skip on initial mount — the files already include the initial propValues
+    if (prevPropsRef.current === payload.propValues) return;
+    prevPropsRef.current = payload.propValues;
+
+    const hasGraph = payload.virtualRepoFiles && payload.entryRepoPath && Object.keys(payload.virtualRepoFiles).length > 0;
+    const entryImport = hasGraph && payload.entryRepoPath
+      ? `./src/r/${payload.entryRepoPath.replace(/\.(tsx|ts|jsx|js|mjs|cjs)$/i, "")}`
+      : "./Component";
+    const globalCssImports = hasGraph
+      ? (payload.globalCssRepoPaths ?? []).map((p) => `./src/r/${p}`)
+      : [];
+
+    const newAppCode = buildAppEntrySource({
+      hasDefaultExport: payload.hasDefaultExport,
+      exportName: payload.exportName || "Component",
+      prefs: payload.prefs,
+      entryImport,
+      globalCssImports,
+      propValues: payload.propValues,
+    });
+
+    sandpack.updateFile("/App.tsx", newAppCode);
+  }, [payload.propValues, payload.prefs, payload.hasDefaultExport, payload.exportName, payload.entryRepoPath, payload.virtualRepoFiles, payload.globalCssRepoPaths, sandpack]);
+
+  return null;
+}
 
 export function ComponentWorkbenchSandpack({
   slug,
@@ -42,13 +80,14 @@ export function ComponentWorkbenchSandpack({
         globalCssRepoPaths: payload.globalCssRepoPaths,
         useTailwindInPreview: payload.useTailwindInPreview,
         sandpackPathContext: payload.sandpackPathContext,
+        propValues: payload.propValues,
       }),
     [
       payload.source,
       payload.dependencies,
       payload.hasDefaultExport,
       payload.exportName,
-      payload.prefs,
+      // intentionally exclude propValues and prefs — those are hot-patched
       payload.virtualRepoFiles,
       payload.entryRepoPath,
       payload.globalCssRepoPaths,
@@ -71,13 +110,9 @@ export function ComponentWorkbenchSandpack({
           initMode: "immediate",
           recompileMode: "delayed",
           recompileDelay: 320,
-          layout: "preview",
-          showTabs: false,
-          showConsole: false,
-          showConsoleButton: false,
-          resizablePanels: false,
         }}
       >
+        <SandpackPropPatcher payload={payload} />
         <SandpackPreview
           className="min-h-0 flex-1"
           showNavigator={false}

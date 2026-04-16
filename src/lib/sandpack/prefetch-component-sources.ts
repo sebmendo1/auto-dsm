@@ -7,7 +7,7 @@ import {
   setCachedComponentSource,
 } from "@/lib/sandpack/component-source-cache";
 
-const MAX_SLUGS = 15;
+const MAX_SLUGS = 0; // Disabled: on-demand fetch is fast enough after graph waterfall fix
 const CONCURRENCY = 4;
 
 async function prefetchOne(repo: string, slug: string, filePath: string, stylePaths: string[]): Promise<void> {

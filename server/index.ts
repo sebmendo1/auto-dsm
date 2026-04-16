@@ -26,7 +26,7 @@ app.get("/api/github/repo-assets", async (req, res) => {
       return;
     }
 
-    const octokit = new Octokit();
+    const octokit = new Octokit(process.env.GITHUB_TOKEN ? { auth: process.env.GITHUB_TOKEN } : {});
     const index = await getRepoPathIndex(octokit, owner, repoName);
     const assets = buildRepoAssetsFromTreeBlobs(
       index.blobs,
@@ -68,7 +68,7 @@ app.post("/api/github/discover-components", async (req, res) => {
     const [owner, repo] = repoFullName.split("/");
     console.log(`[auto-dsm] discover-components start repo=${repoFullName}`);
 
-    const result = await discoverComponents(owner, repo);
+    const result = await discoverComponents(owner, repo, process.env.GITHUB_TOKEN);
 
     const ms = Date.now() - started;
     const paths = result.componentPaths?.length ?? 0;

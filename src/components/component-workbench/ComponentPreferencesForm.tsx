@@ -1,87 +1,151 @@
-import type { WorkbenchPreviewPrefs } from "@/lib/sandpack/workbench-preferences";
-import { DEFAULT_WORKBENCH_PREFS } from "@/lib/sandpack/workbench-preferences";
+import type { ExtractedProp, ExtractedVariant } from "@/lib/renderer/types";
 
 type Props = {
-  prefs: WorkbenchPreviewPrefs;
-  onChange: (next: WorkbenchPreviewPrefs) => void;
+  propsMeta: ExtractedProp[];
+  variantsMeta: ExtractedVariant[];
+  propValues: Record<string, string | boolean>;
+  onPropValuesChange: (next: Record<string, string | boolean>) => void;
   fileName: string;
 };
 
-export function ComponentPreferencesForm({ prefs, onChange, fileName }: Props) {
+function PillToggle({
+  value,
+  onChange,
+}: {
+  value: boolean;
+  onChange: (v: boolean) => void;
+}) {
   return (
-    <div className="flex min-h-0 flex-1 flex-col space-y-6 overflow-y-auto p-5">
-      <div className="space-y-2">
-        <label className="text-xs font-medium text-foreground-secondary" htmlFor="wb-canvas">
-          Canvas
-        </label>
-        <select
-          id="wb-canvas"
-          className="w-full rounded-md border border-border bg-input-bg px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring-focus"
-          value={prefs.canvas}
-          onChange={(e) =>
-            onChange({
-              ...prefs,
-              canvas: e.target.value as WorkbenchPreviewPrefs["canvas"],
-            })
-          }
-        >
-          <option value="neutral">Neutral</option>
-          <option value="light">Light</option>
-          <option value="dark">Dark</option>
-        </select>
-      </div>
-
-      <div className="space-y-2">
-        <label className="text-xs font-medium text-foreground-secondary" htmlFor="wb-padding">
-          Padding
-        </label>
-        <select
-          id="wb-padding"
-          className="w-full rounded-md border border-border bg-input-bg px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring-focus"
-          value={prefs.padding}
-          onChange={(e) =>
-            onChange({
-              ...prefs,
-              padding: e.target.value as WorkbenchPreviewPrefs["padding"],
-            })
-          }
-        >
-          <option value="compact">Compact</option>
-          <option value="comfortable">Comfortable</option>
-        </select>
-      </div>
-
-      <div className="space-y-2">
-        <label className="flex items-center gap-2 text-xs font-medium text-foreground-secondary">
-          <input
-            type="checkbox"
-            className="rounded border-border"
-            checked={prefs.showCaption}
-            onChange={(e) => onChange({ ...prefs, showCaption: e.target.checked })}
-          />
-          Show caption
-        </label>
-        <input
-          type="text"
-          className="w-full rounded-md border border-border bg-input-bg px-3 py-2 text-sm text-foreground placeholder:text-foreground-tertiary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring-focus disabled:opacity-50"
-          placeholder="Caption text"
-          value={prefs.caption}
-          disabled={!prefs.showCaption}
-          onChange={(e) => onChange({ ...prefs, caption: e.target.value })}
-        />
-      </div>
-
+    <div className="inline-flex overflow-hidden rounded-full border border-border text-xs font-medium">
       <button
         type="button"
-        className="self-start text-xs text-foreground-tertiary underline-offset-2 hover:text-foreground-secondary hover:underline"
-        onClick={() => onChange({ ...DEFAULT_WORKBENCH_PREFS })}
+        className={`px-3 py-1.5 transition-colors ${
+          !value
+            ? "bg-brand text-white"
+            : "bg-transparent text-foreground-secondary hover:text-foreground"
+        }`}
+        onClick={() => onChange(false)}
       >
-        Reset preferences
+        Off
       </button>
+      <button
+        type="button"
+        className={`px-3 py-1.5 transition-colors ${
+          value
+            ? "bg-brand text-white"
+            : "bg-transparent text-foreground-secondary hover:text-foreground"
+        }`}
+        onClick={() => onChange(true)}
+      >
+        On
+      </button>
+    </div>
+  );
+}
 
-      <p className="text-xs text-foreground-secondary">
-        Preview chrome only — does not inject props into <span className="font-mono">{fileName}</span>.
-      </p>
+function labelForPropName(name: string): string {
+  return name
+    .replace(/([A-Z])/g, " $1")
+    .replace(/^./, (s) => s.toUpperCase())
+    .trim();
+}
+
+export function ComponentPreferencesForm({
+  propsMeta,
+  variantsMeta,
+  propValues,
+  onPropValuesChange,
+  fileName,
+}: Props) {
+  const booleanProps = propsMeta.filter(
+    (p) =>
+      (p.type === "boolean" || p.type === "boolean | undefined") &&
+      !variantsMeta.some((v) => v.name === p.name),
+  );
+
+  const stringProps = propsMeta.filter(
+    (p) =>
+      (p.type === "string" ||
+        p.type === "string | undefined" ||
+        p.type === "ReactNode" ||
+        p.type === "ReactNode | undefined") &&
+      !variantsMeta.some((v) => v.name === p.name) &&
+      (p.name === "children" || p.name === "label" || p.name === "title" || p.name === "text" || p.name === "placeholder"),
+  );
+
+  const hasControls = variantsMeta.length > 0 || booleanProps.length > 0 || stringProps.length > 0;
+
+  const update = (key: string, value: string | boolean) => {
+    onPropValuesChange({ ...propValues, [key]: value });
+  };
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col space-y-6 overflow-y-auto p-5">
+      {hasControls ? (
+        <>
+          {/* Variant dropdowns (Configuration, State, Size, etc.) */}
+          {variantsMeta.map((variant) => (
+            <div key={variant.name} className="space-y-2">
+              <label
+                className="text-xs font-medium text-foreground-secondary"
+                htmlFor={`prop-${variant.name}`}
+              >
+                {labelForPropName(variant.name)}
+              </label>
+              <select
+                id={`prop-${variant.name}`}
+                className="w-full rounded-md border border-border bg-input-bg px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring-focus"
+                value={(propValues[variant.name] as string) ?? variant.defaultValue ?? variant.values[0]}
+                onChange={(e) => update(variant.name, e.target.value)}
+              >
+                {variant.values.map((v) => (
+                  <option key={v} value={v}>
+                    {v.charAt(0).toUpperCase() + v.slice(1)}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ))}
+
+          {/* Boolean toggles (Selected, Disabled, Loading, etc.) */}
+          {booleanProps.map((prop) => (
+            <div key={prop.name} className="space-y-2">
+              <label className="text-xs font-medium text-foreground-secondary">
+                {labelForPropName(prop.name)}
+              </label>
+              <PillToggle
+                value={!!propValues[prop.name]}
+                onChange={(v) => update(prop.name, v)}
+              />
+            </div>
+          ))}
+
+          {/* String inputs (Label, Title, Children, etc.) */}
+          {stringProps.map((prop) => (
+            <div key={prop.name} className="space-y-2">
+              <label
+                className="text-xs font-medium text-foreground-secondary"
+                htmlFor={`prop-${prop.name}`}
+              >
+                {labelForPropName(prop.name)}
+              </label>
+              <input
+                id={`prop-${prop.name}`}
+                type="text"
+                className="w-full rounded-md border border-border bg-input-bg px-3 py-2 text-sm text-foreground placeholder:text-foreground-tertiary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring-focus"
+                placeholder="Value"
+                value={(propValues[prop.name] as string) ?? ""}
+                onChange={(e) => update(prop.name, e.target.value)}
+              />
+            </div>
+          ))}
+        </>
+      ) : (
+        <p className="text-xs text-foreground-secondary">
+          No extractable props found for <span className="font-mono">{fileName}</span>. Controls
+          appear automatically when the component has typed props or CVA variants.
+        </p>
+      )}
     </div>
   );
 }

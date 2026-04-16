@@ -7,7 +7,6 @@ import { npmInstallPackageName } from "./npm-spec";
 import { rewriteRepoSourceForSandpack } from "./repo-import-rewrite";
 import {
   sanitizeComponentSourceForSandpack,
-  stripPathAliasImports,
   stripTailwindDirectives,
 } from "./sanitize-component-source";
 import type { WorkbenchPreviewPrefs } from "./workbench-preferences";
@@ -100,6 +99,7 @@ export function buildAppEntrySource(params: {
   prefs: WorkbenchPreviewPrefs;
   entryImport?: string;
   globalCssImports?: string[];
+  propValues?: Record<string, string | boolean>;
 }): string {
   const { hasDefaultExport, exportName, prefs } = params;
   const { background, minHeight } = canvasStyle(prefs);
@@ -116,6 +116,30 @@ export function buildAppEntrySource(params: {
     ? `      <p style={{ margin: "0 0 12px", fontSize: 12, opacity: 0.75 }}>{${JSON.stringify(prefs.caption)}}</p>`
     : "";
 
+  // Build prop string from propValues
+  let childrenValue = "";
+  const propAttrs: string[] = [];
+  if (params.propValues) {
+    for (const [key, value] of Object.entries(params.propValues)) {
+      if (key === "children") {
+        if (typeof value === "string" && value.length > 0) {
+          childrenValue = value;
+        }
+        continue;
+      }
+      if (value === false || value === "" || value === undefined) continue;
+      if (value === true) {
+        propAttrs.push(key);
+      } else {
+        propAttrs.push(`${key}=${JSON.stringify(value)}`);
+      }
+    }
+  }
+  const propsString = propAttrs.length > 0 ? ` ${propAttrs.join(" ")}` : "";
+  const demoJsx = childrenValue
+    ? `<Demo${propsString}>${childrenValue}</Demo>`
+    : `<Demo${propsString} />`;
+
   return [
     ...styleLines,
     importLine,
@@ -130,11 +154,14 @@ export function buildAppEntrySource(params: {
     `        background: "${background}",`,
     `        minHeight: ${minHeight},`,
     '        boxSizing: "border-box",',
+    '        display: "flex",',
+    '        alignItems: "center",',
+    '        justifyContent: "center",',
     "      }}",
     "    >",
     captionLine,
     "      <MemoryRouter initialEntries={['/']}>",
-    "        <Demo />",
+    `        ${demoJsx}`,
     "      </MemoryRouter>",
     "    </div>",
     "  );",
@@ -178,6 +205,8 @@ export type BuildSandpackFilesParams = {
   useTailwindInPreview?: boolean;
   /** From `GET /api/components/:slug` — enables alias → relative rewrite in graph mode. */
   sandpackPathContext?: TsPathsConfig;
+  /** Live prop values from the inspector controls — injected into the Sandpack App.tsx entry. */
+  propValues?: Record<string, string | boolean>;
 };
 
 export function buildSandpackFiles(params: BuildSandpackFilesParams): {
@@ -225,6 +254,7 @@ export function buildSandpackFiles(params: BuildSandpackFilesParams): {
       prefs: params.prefs,
       entryImport,
       globalCssImports,
+      propValues: params.propValues,
     });
 
     files["/App.tsx"] = { code: appCode, active: true };
@@ -256,6 +286,7 @@ export function buildSandpackFiles(params: BuildSandpackFilesParams): {
       hasDefaultExport: params.hasDefaultExport,
       exportName: params.exportName || "Component",
       prefs: params.prefs,
+      propValues: params.propValues,
     });
     files["/Component.tsx"] = { code: componentCode, active: true };
     files["/App.tsx"] = { code: appCode, active: true };

@@ -1,6 +1,7 @@
 import { useId, useState } from "react";
 import { ExternalLink } from "lucide-react";
 import type { WorkbenchPreviewPrefs } from "@/lib/sandpack/workbench-preferences";
+import type { ExtractedProp, ExtractedVariant } from "@/lib/renderer/types";
 import { ComponentPreferencesForm } from "./ComponentPreferencesForm";
 
 type RightTab = "code" | "preferences";
@@ -11,14 +12,20 @@ type Props = {
   prefs: WorkbenchPreviewPrefs;
   onPrefsChange: (next: WorkbenchPreviewPrefs) => void;
   githubHref: string | null;
+  propsMeta: ExtractedProp[];
+  variantsMeta: ExtractedVariant[];
+  propValues: Record<string, string | boolean>;
+  onPropValuesChange: (next: Record<string, string | boolean>) => void;
 };
 
 export function ComponentWorkbenchInspector({
   source,
   fileName,
-  prefs,
-  onPrefsChange,
   githubHref,
+  propsMeta,
+  variantsMeta,
+  propValues,
+  onPropValuesChange,
 }: Props) {
   const [tab, setTab] = useState<RightTab>("preferences");
   const baseId = useId();
@@ -92,7 +99,13 @@ export function ComponentWorkbenchInspector({
             <div className="shrink-0 border-b border-border px-5 pb-3 pt-4">
               <h3 className="text-sm font-semibold text-foreground">Preferences</h3>
             </div>
-            <ComponentPreferencesForm prefs={prefs} onChange={onPrefsChange} fileName={fileName} />
+            <ComponentPreferencesForm
+              propsMeta={propsMeta}
+              variantsMeta={variantsMeta}
+              propValues={propValues}
+              onPropValuesChange={onPropValuesChange}
+              fileName={fileName}
+            />
           </div>
         )}
       </div>

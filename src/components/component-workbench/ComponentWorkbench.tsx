@@ -1,6 +1,9 @@
 import { useMemo, useState } from "react";
 import type { CachedComponentPayload } from "@/lib/sandpack/component-source-cache";
 import { DEFAULT_WORKBENCH_PREFS, type WorkbenchPreviewPrefs } from "@/lib/sandpack/workbench-preferences";
+import { parseProps, extractStateProps } from "@/lib/renderer/props-parser";
+import { extractAllVariants } from "@/lib/renderer/variant-extractor";
+import type { ExtractedProp, ExtractedVariant } from "@/lib/renderer/types";
 import { ComponentWorkbenchShell } from "./ComponentWorkbenchShell";
 import { ComponentWorkbenchInspector } from "./ComponentWorkbenchInspector";
 import { ComponentWorkbenchPreviewColumn } from "./ComponentWorkbenchPreviewColumn";
@@ -17,6 +20,33 @@ function fileBaseName(path: string): string {
   return path.split("/").pop() ?? path;
 }
 
+function buildInitialPropValues(
+  variants: ExtractedVariant[],
+  props: ExtractedProp[],
+): Record<string, string | boolean> {
+  const values: Record<string, string | boolean> = {};
+  for (const v of variants) {
+    values[v.name] = v.defaultValue ?? v.values[0] ?? "";
+  }
+  const stateNames = new Set(extractStateProps(props));
+  for (const p of props) {
+    if (p.name in values) continue; // already covered by variant
+    if (p.type === "boolean" || p.type === "boolean | undefined") {
+      values[p.name] = stateNames.has(p.name) ? false : false;
+    } else if (
+      p.type === "string" ||
+      p.type === "string | undefined" ||
+      p.type === "ReactNode" ||
+      p.type === "ReactNode | undefined"
+    ) {
+      if (p.name === "children" || p.name === "label" || p.name === "title" || p.name === "text") {
+        values[p.name] = p.name.charAt(0).toUpperCase() + p.name.slice(1);
+      }
+    }
+  }
+  return values;
+}
+
 type Props = {
   slug: string;
   data: CachedComponentPayload;
@@ -28,6 +58,14 @@ export function ComponentWorkbench({ slug, data, repo }: Props) {
   const githubHref = useMemo(() => githubBlobUrl(repo, data.filePath), [repo, data.filePath]);
   const hasVirtualGraph =
     !!data.virtualRepoFiles && Object.keys(data.virtualRepoFiles).length > 0;
+
+  // Extract prop and variant metadata from source
+  const propsMeta = useMemo(() => parseProps(data.source), [data.source]);
+  const variantsMeta = useMemo(() => extractAllVariants(data.source), [data.source]);
+
+  const [propValues, setPropValues] = useState<Record<string, string | boolean>>(() =>
+    buildInitialPropValues(variantsMeta, propsMeta),
+  );
 
   const payload = useMemo(
     () => ({
@@ -41,6 +79,7 @@ export function ComponentWorkbench({ slug, data, repo }: Props) {
       globalCssRepoPaths: data.globalCssRepoPaths,
       useTailwindInPreview: data.useTailwindInPreview,
       sandpackPathContext: data.sandpackPathContext,
+      propValues,
     }),
     [
       data.source,
@@ -54,6 +93,7 @@ export function ComponentWorkbench({ slug, data, repo }: Props) {
       data.sandpackPathContext,
       hasVirtualGraph,
       prefs,
+      propValues,
     ],
   );
 
@@ -78,6 +118,10 @@ export function ComponentWorkbench({ slug, data, repo }: Props) {
           prefs={prefs}
           onPrefsChange={setPrefs}
           githubHref={githubHref}
+          propsMeta={propsMeta}
+          variantsMeta={variantsMeta}
+          propValues={propValues}
+          onPropValuesChange={setPropValues}
         />
       </div>
     </ComponentWorkbenchShell>

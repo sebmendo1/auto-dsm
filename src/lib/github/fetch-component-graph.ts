@@ -15,6 +15,7 @@ import {
   pathAliasPrefixesFromPaths,
   type TsPathsConfig,
 } from "./tsconfig-paths";
+import { getRepoPathIndex } from "./repo-path-index";
 
 function maxGraphFiles(): number {
   const raw = typeof process !== "undefined" ? process.env.COMPONENT_GRAPH_MAX_FILES : undefined;
@@ -71,40 +72,54 @@ function extensionCandidates(resolvedBase: string): string[] {
   ];
 }
 
-async function fetchRepoTextFile(
-  octokit: Octokit,
+/** Resolve an import base path to an actual file using the tree index (zero HTTP calls). */
+function resolveFromPathSet(basePath: string, pathSet: Set<string>): string | null {
+  const normalized = normalizeRepoPath(basePath);
+  for (const candidate of extensionCandidates(normalized)) {
+    if (pathSet.has(candidate)) return candidate;
+  }
+  return null;
+}
+
+/** Fetch a file from raw.githubusercontent.com (does not count against REST API rate limit). */
+async function fetchRawFile(
   owner: string,
   repo: string,
   ref: string,
   path: string,
 ): Promise<string | null> {
   try {
-    const { data } = await octokit.rest.repos.getContent({
-      owner,
-      repo,
-      path,
-      ref,
-    });
-    if (!("content" in data) || data.encoding !== "base64") return null;
-    return Buffer.from(data.content, "base64").toString("utf-8");
+    const encodedPath = path.split("/").map(encodeURIComponent).join("/");
+    const url = `https://raw.githubusercontent.com/${owner}/${repo}/${ref}/${encodedPath}`;
+    const res = await fetch(url);
+    return res.ok ? res.text() : null;
   } catch {
     return null;
   }
 }
 
-async function resolveAndFetchFromRepoBasePath(
-  octokit: Octokit,
+/** Fetch multiple files in parallel, in batches to avoid overwhelming the network. */
+async function batchFetchRawFiles(
   owner: string,
   repo: string,
   ref: string,
-  repoBasePath: string,
-): Promise<{ path: string; content: string } | null> {
-  const normalized = normalizeRepoPath(repoBasePath);
-  for (const candidate of extensionCandidates(normalized)) {
-    const content = await fetchRepoTextFile(octokit, owner, repo, ref, candidate);
-    if (content) return { path: candidate, content };
+  paths: string[],
+  batchSize = 15,
+): Promise<Record<string, string>> {
+  const results: Record<string, string> = {};
+  for (let i = 0; i < paths.length; i += batchSize) {
+    const batch = paths.slice(i, i + batchSize);
+    const fetched = await Promise.all(
+      batch.map(async (p) => {
+        const content = await fetchRawFile(owner, repo, ref, p);
+        return { path: p, content };
+      }),
+    );
+    for (const { path, content } of fetched) {
+      if (content) results[path] = content;
+    }
   }
-  return null;
+  return results;
 }
 
 function mergeDepsFromFiles(
@@ -125,33 +140,6 @@ function detectTailwind(cssContents: string[]): boolean {
   return cssContents.some((c) => /@tailwind\b/.test(c));
 }
 
-async function loadSandpackPathContext(
-  octokit: Octokit,
-  owner: string,
-  repo: string,
-  ref: string,
-): Promise<TsPathsConfig | null> {
-  let ctx: TsPathsConfig | null = null;
-
-  const rootRaw = await fetchRepoTextFile(octokit, owner, repo, ref, "tsconfig.json");
-  if (rootRaw) {
-    const parsed = parseTsconfigCompilerOptions(rootRaw);
-    if (parsed) {
-      ctx = mergePathsConfig(ctx, { baseUrl: parsed.baseUrl, paths: parsed.paths }, "");
-    }
-  }
-
-  const appRaw = await fetchRepoTextFile(octokit, owner, repo, ref, "tsconfig.app.json");
-  if (appRaw) {
-    const parsed = parseTsconfigCompilerOptions(appRaw);
-    if (parsed) {
-      ctx = mergePathsConfig(ctx, { baseUrl: parsed.baseUrl, paths: parsed.paths }, "");
-    }
-  }
-
-  return ctx;
-}
-
 function tsPathKeys(ctx: TsPathsConfig | null): string[] {
   return ctx ? Object.keys(ctx.paths) : [];
 }
@@ -165,39 +153,67 @@ export async function fetchComponentWorkbenchGraph(
 ): Promise<ComponentWorkbenchGraph> {
   const octokit = new Octokit(accessToken ? { auth: accessToken } : {});
 
-  let ref = options?.branch;
-  if (!ref) {
-    const { data: repoData } = await octokit.rest.repos.get({ owner, repo });
-    ref = repoData.default_branch;
+  // 1. Fetch tree index (single API call, cached by commit SHA for 3 min)
+  const index = await getRepoPathIndex(octokit, owner, repo, options?.branch);
+  const ref = index.commitSha;
+  const pathSet = new Set(index.paths);
+
+  // 2. Load tsconfig path aliases in parallel (check tree first to avoid 404s)
+  const tsconfigPaths = ["tsconfig.json", "tsconfig.app.json"].filter((p) => pathSet.has(p));
+  const tsconfigContents = await batchFetchRawFiles(owner, repo, ref, tsconfigPaths);
+
+  let pathCtx: TsPathsConfig | null = null;
+  for (const configPath of tsconfigPaths) {
+    const raw = tsconfigContents[configPath];
+    if (!raw) continue;
+    const parsed = parseTsconfigCompilerOptions(raw);
+    if (parsed) {
+      pathCtx = mergePathsConfig(pathCtx, { baseUrl: parsed.baseUrl, paths: parsed.paths }, "");
+    }
   }
 
-  const pathCtx = await loadSandpackPathContext(octokit, owner, repo, ref);
   const keys = tsPathKeys(pathCtx);
   const limit = maxGraphFiles();
 
+  // 3. BFS: resolve the dependency graph using tree-based extension resolution
+  //    Each file still needs to be fetched to parse its imports, but extension
+  //    resolution is instant (Set lookup) instead of 10 HTTP probes per import.
   const virtualRepoFiles: Record<string, string> = {};
   const queue: string[] = [entryFilePath, ...(options?.extraRepoPaths ?? [])];
   const seenQueued = new Set<string>();
 
   while (queue.length > 0 && Object.keys(virtualRepoFiles).length < limit) {
-    const next = queue.shift();
-    if (!next || seenQueued.has(next)) continue;
-    seenQueued.add(next);
+    // Collect the next batch of unvisited paths to fetch in parallel
+    const toFetch: string[] = [];
+    while (queue.length > 0 && toFetch.length < 15 && (Object.keys(virtualRepoFiles).length + toFetch.length) < limit) {
+      const next = queue.shift();
+      if (!next || seenQueued.has(next)) continue;
+      seenQueued.add(next);
+      if (pathSet.has(next)) {
+        toFetch.push(next);
+      }
+    }
 
-    const content = await fetchRepoTextFile(octokit, owner, repo, ref, next);
-    if (!content) continue;
-    virtualRepoFiles[next] = content;
+    if (toFetch.length === 0) break;
 
-    if (!TEXT_EXT.test(next) || next.endsWith(".css") || next.endsWith(".scss")) continue;
+    // Batch-fetch this round of files
+    const fetched = await batchFetchRawFiles(owner, repo, ref, toFetch);
 
-    for (const spec of extractLocalModuleSpecifiers(content, keys)) {
-      const basePath = resolveSpecifierToRepoBasePath(next, spec, pathCtx);
-      if (!basePath) continue;
+    for (const [filePath, content] of Object.entries(fetched)) {
+      virtualRepoFiles[filePath] = content;
 
-      const resolved = await resolveAndFetchFromRepoBasePath(octokit, owner, repo, ref, basePath);
-      if (!resolved) continue;
-      if (!virtualRepoFiles[resolved.path] && Object.keys(virtualRepoFiles).length < limit) {
-        queue.push(resolved.path);
+      // Only parse imports from code files (not CSS)
+      if (!TEXT_EXT.test(filePath) || filePath.endsWith(".css") || filePath.endsWith(".scss")) continue;
+
+      for (const spec of extractLocalModuleSpecifiers(content, keys)) {
+        const basePath = resolveSpecifierToRepoBasePath(filePath, spec, pathCtx);
+        if (!basePath) continue;
+
+        // Resolve via tree Set — zero HTTP calls
+        const resolvedPath = resolveFromPathSet(basePath, pathSet);
+        if (resolvedPath && !seenQueued.has(resolvedPath) && !virtualRepoFiles[resolvedPath]) {
+          queue.push(resolvedPath);
+        }
       }
     }
   }
@@ -207,16 +223,23 @@ export async function fetchComponentWorkbenchGraph(
     throw new Error(`Cannot read component file: ${entryFilePath}`);
   }
 
+  // 4. Global CSS: check tree index, then batch-fetch only existing files
   const globalCssRepoPaths: string[] = [];
+  const globalCssToFetch: string[] = [];
   for (const g of GLOBAL_CSS_CANDIDATES) {
     if (virtualRepoFiles[g]) {
       globalCssRepoPaths.push(g);
-      continue;
+    } else if (pathSet.has(g)) {
+      globalCssToFetch.push(g);
     }
-    const gContent = await fetchRepoTextFile(octokit, owner, repo, ref, g);
-    if (gContent) {
-      virtualRepoFiles[g] = gContent;
-      globalCssRepoPaths.push(g);
+  }
+  if (globalCssToFetch.length > 0) {
+    const cssContents = await batchFetchRawFiles(owner, repo, ref, globalCssToFetch);
+    for (const g of globalCssToFetch) {
+      if (cssContents[g]) {
+        virtualRepoFiles[g] = cssContents[g];
+        globalCssRepoPaths.push(g);
+      }
     }
   }
 

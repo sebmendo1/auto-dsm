@@ -1,11 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
 import { Toast } from "@/components/ui/toast";
 import type { ColorToken, ParseResult } from "@/lib/parser";
 import { readStoredTokens } from "@/lib/parser/storage";
-import { extractColorsFromRepo } from "@/lib/github/fetcher";
-import { isDemoRepo } from "@/lib/demo/demo-mode";
-import { notifyAppDataUpdated } from "@/lib/app-events";
 
 const PRIMARY_SECTION_DESCRIPTION =
   "Primary colors are used for your main brand. These are the essential pieces of your experience.";
@@ -115,52 +111,16 @@ type ColorRowView = ColorToken & { hex: string; rgb: string; hsl: string };
 
 export function BrandColorsPage() {
   const [tokens, setTokens] = useState<ParseResult | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [loading] = useState(false);
+  const [error] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
-  const [searchParams] = useSearchParams();
-  const state = searchParams.get("state");
-  const repo = searchParams.get("repo");
 
   useEffect(() => {
     setTokens(readStoredTokens());
+    const onUpdate = () => setTokens(readStoredTokens());
+    window.addEventListener("autodsm:updated", onUpdate);
+    return () => window.removeEventListener("autodsm:updated", onUpdate);
   }, []);
-
-  useEffect(() => {
-    if (state !== "parsing" || !repo) return;
-    if (isDemoRepo(repo)) return;
-    let mounted = true;
-    const run = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        const results = await extractColorsFromRepo(repo);
-        if (!mounted) return;
-        const merged = results.flatMap((entry) => entry.colors);
-        const deduped = dedupeColors(merged);
-        const prev = readStoredTokens();
-        const payload: ParseResult = {
-          colors: deduped,
-          typography: prev?.typography ?? [],
-          typographyRows: prev?.typographyRows,
-          assets: prev?.assets ?? [],
-        };
-        setTokens(payload);
-        localStorage.setItem("autodsm:tokens", JSON.stringify(payload));
-        localStorage.setItem("autodsm:lastRepo", repo);
-        notifyAppDataUpdated();
-      } catch (err) {
-        if (!mounted) return;
-        setError(err instanceof Error ? err.message : "Failed to parse repo");
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    };
-    run();
-    return () => {
-      mounted = false;
-    };
-  }, [repo, state]);
 
   const displayColors = useMemo(() => tokens?.colors ?? [], [tokens]);
   const colorCount = displayColors.length;
@@ -228,13 +188,6 @@ export function BrandColorsPage() {
           <div className="py-12 text-center">
             <p className="text-sm text-foreground-secondary">{error}</p>
           </div>
-        ) : !repo && !hasContent ? (
-          <div className="py-12 text-center">
-            <p className="text-sm font-medium text-foreground">No color data yet</p>
-            <p className="mt-2 text-sm text-foreground-secondary">
-              Connect a repository to extract your color tokens.
-            </p>
-          </div>
         ) : !hasContent ? (
           <div className="py-12 text-center">
             <p className="text-sm font-medium text-foreground">No colors found</p>
@@ -245,7 +198,7 @@ export function BrandColorsPage() {
         ) : (
           <>
             <p className="text-xs text-foreground-tertiary">
-              {colorCount} colors{repo ? ` · Source: ${repo}` : ""}
+              {colorCount} colors
             </p>
             {grouped.map((section) => (
               <section key={section.key} className="space-y-6">
@@ -301,13 +254,3 @@ export function BrandColorsPage() {
   );
 }
 
-function dedupeColors(colors: ColorToken[]) {
-  const seen = new Map<string, ColorToken>();
-  for (const color of colors) {
-    const key = `${color.name}:${color.value}`;
-    if (!seen.has(key)) {
-      seen.set(key, color);
-    }
-  }
-  return Array.from(seen.values());
-}
