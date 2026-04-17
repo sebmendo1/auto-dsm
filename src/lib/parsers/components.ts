@@ -40,9 +40,16 @@ export interface ParseOptions {
   source: string;
   /** Best-effort map of relative import path → source, for local inlining. */
   relatedFiles?: Map<string, string>;
+  /**
+   * tsconfig `paths` aliases, each value is a list of absolute filesystem
+   * prefixes (no leading slash) the alias resolves to. Example:
+   *   '@/*' → ['apps/www/', 'packages/ui/src/']
+   * The '*' is stripped; caller is responsible for producing clean prefixes.
+   */
+  aliases?: Record<string, string[]>;
 }
 
-export function parseComponent({ filePath, source, relatedFiles }: ParseOptions): ParsedComponent | null {
+export function parseComponent({ filePath, source, relatedFiles, aliases }: ParseOptions): ParsedComponent | null {
   let ast;
   try {
     ast = parse(source, {
@@ -195,10 +202,70 @@ export function parseComponent({ filePath, source, relatedFiles }: ParseOptions)
     return null;
   }
 
+  /**
+   * Try to resolve an aliased import (e.g. `@/components/ui/button`).
+   * For each alias prefix, try joining + standard extension candidates.
+   * Returns the first hit.
+   */
+  function resolveAlias(spec: string): { key: string; source: string } | null {
+    if (!aliases || !relatedFiles) return null;
+    for (const [aliasKey, prefixes] of Object.entries(aliases)) {
+      // aliasKey is bare like '@/' or '~/' (trailing slash implied).
+      const stripped = aliasKey.endsWith('/') ? aliasKey.slice(0, -1) : aliasKey;
+      if (spec !== stripped && !spec.startsWith(stripped + '/')) continue;
+      const tail = spec.slice(stripped.length).replace(/^\//, '');
+      for (const prefix of prefixes) {
+        const base = '/' + prefix.replace(/^\//, '').replace(/\/$/, '') + (tail ? '/' + tail : '');
+        const candidates = [
+          base, base + '.ts', base + '.tsx', base + '.js', base + '.jsx',
+          base + '/index.ts', base + '/index.tsx', base + '/index.js', base + '/index.jsx',
+        ];
+        for (const k of candidates) {
+          const s = relatedFiles.get(k);
+          if (s != null) return { key: k, source: s };
+        }
+      }
+    }
+    return null;
+  }
+
+  function isAliased(spec: string): boolean {
+    if (!aliases) return false;
+    for (const aliasKey of Object.keys(aliases)) {
+      const stripped = aliasKey.endsWith('/') ? aliasKey.slice(0, -1) : aliasKey;
+      if (spec === stripped || spec.startsWith(stripped + '/')) return true;
+    }
+    return false;
+  }
+
   const queue: Array<{ fromDir: string; rel: string }> = [];
   for (const [src] of state.imports) {
     if (src.startsWith('.') || src.startsWith('/')) {
       queue.push({ fromDir: fileDir, rel: src });
+    } else if (isAliased(src)) {
+      const hit = resolveAlias(src);
+      if (hit && !seenLocal.has(hit.key)) {
+        seenLocal.add(hit.key);
+        localImports.push({ from: src, resolved_path: hit.key, source: hit.source });
+        const nextDir = hit.key.split('/').slice(0, -1).join('/');
+        const re = /(?:from|import)\s*['"]([^'"]+)['"]/g;
+        let m: RegExpExecArray | null;
+        while ((m = re.exec(hit.source)) !== null) {
+          const s = m[1];
+          if (s.startsWith('.') || s.startsWith('/')) {
+            queue.push({ fromDir: nextDir, rel: s });
+          } else if (isAliased(s)) {
+            const h2 = resolveAlias(s);
+            if (h2 && !seenLocal.has(h2.key)) {
+              seenLocal.add(h2.key);
+              localImports.push({ from: s, resolved_path: h2.key, source: h2.source });
+              queue.push({ fromDir: h2.key.split('/').slice(0, -1).join('/'), rel: '.' });
+            }
+          } else if (!s.startsWith('react') && s !== 'react-dom') {
+            dependencies[s] = 'latest';
+          }
+        }
+      }
     } else if (!src.startsWith('react') && src !== 'react-dom') {
       dependencies[src] = 'latest';
     }
@@ -206,36 +273,72 @@ export function parseComponent({ filePath, source, relatedFiles }: ParseOptions)
 
   while (queue.length) {
     const { fromDir, rel } = queue.shift()!;
+    if (rel === '.' || rel === '') continue;
     const hit = tryResolve(fromDir, rel);
     if (!hit || seenLocal.has(hit.key)) continue;
     seenLocal.add(hit.key);
     localImports.push({ from: rel, resolved_path: hit.key, source: hit.source });
-    // Enqueue nested relative imports from this newly-inlined file.
+    // Enqueue nested imports from this newly-inlined file.
     const nextDir = hit.key.split('/').slice(0, -1).join('/');
-    const re = /(?:from|import)\s*['"](\.[^'"]+|\/[^'"]+)['"]/g;
+    const re = /(?:from|import)\s*['"]([^'"]+)['"]/g;
     let m: RegExpExecArray | null;
     while ((m = re.exec(hit.source)) !== null) {
-      queue.push({ fromDir: nextDir, rel: m[1] });
-    }
-    // Non-relative bare imports from nested files also add to deps.
-    const bare = /(?:from|import)\s*['"]([^.\/'"][^'"]*)['"]/g;
-    let b: RegExpExecArray | null;
-    while ((b = bare.exec(hit.source)) !== null) {
-      const s = b[1];
-      if (!s.startsWith('react') && s !== 'react-dom') dependencies[s] = 'latest';
+      const s = m[1];
+      if (s.startsWith('.') || s.startsWith('/')) {
+        queue.push({ fromDir: nextDir, rel: s });
+      } else if (isAliased(s)) {
+        const h2 = resolveAlias(s);
+        if (h2 && !seenLocal.has(h2.key)) {
+          seenLocal.add(h2.key);
+          localImports.push({ from: s, resolved_path: h2.key, source: h2.source });
+          // Walk its relatives too.
+          const subDir = h2.key.split('/').slice(0, -1).join('/');
+          const sre = /(?:from|import)\s*['"](\.[^'"]+|\/[^'"]+)['"]/g;
+          let sm: RegExpExecArray | null;
+          while ((sm = sre.exec(h2.source)) !== null) {
+            queue.push({ fromDir: subDir, rel: sm[1] });
+          }
+        }
+      } else if (!s.startsWith('react') && s !== 'react-dom') {
+        dependencies[s] = 'latest';
+      }
     }
   }
+
+  /**
+   * Rewrite aliased imports in a source file to absolute virtual-FS paths
+   * (leading slash) so the runtime bundler doesn't treat them as bare.
+   * Relative imports are left untouched.
+   */
+  function rewriteAliases(src: string): string {
+    if (!aliases) return src;
+    return src.replace(
+      /((?:from|import)\s*['"])([^.\/][^'"]*)(['"])/g,
+      (full, pre, spec, post) => {
+        if (!isAliased(spec)) return full;
+        const hit = resolveAlias(spec);
+        if (!hit) return full;
+        return pre + hit.key + post;
+      },
+    );
+  }
+
+  const rewrittenSource = rewriteAliases(source);
+  const rewrittenLocalImports = localImports.map((li) => ({
+    ...li,
+    source: rewriteAliases(li.source),
+  }));
 
   return {
     name: primary.name,
     slug: slugify(primary.name),
     file_path: filePath,
-    source_code: source,
+    source_code: rewrittenSource,
     props,
     initial_props,
     presets,
     dependencies,
-    local_imports: localImports,
+    local_imports: rewrittenLocalImports,
   };
 }
 

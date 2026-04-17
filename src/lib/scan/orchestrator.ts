@@ -85,6 +85,12 @@ export async function scanRepo(
     }
     emit({ phase: 'framework_ok', message: 'Framework: React + TypeScript ✓' });
 
+    // ─── tsconfig paths (alias discovery) ────────────────────────────
+    // Extract `compilerOptions.paths` from every tsconfig*.json so that
+    // imports like `@/components/ui/button` can be resolved back to a
+    // real virtual-FS path during parsing.
+    const aliases = await loadAliases(gh, { owner, name, branch: defaultBranch }, tree);
+
     // ─── Component candidates ─────────────────────────────────────────
     const tsxFiles = tree.filter(
       (t) =>
@@ -108,7 +114,7 @@ export async function scanRepo(
         !/\b(node_modules|\.next|dist|build|out|coverage)\b/.test(t.path) &&
         !/\.(test|spec|stories)\.(tsx?|jsx?)$/.test(t.path) &&
         (t.size ?? 0) < 60_000,
-    ).slice(0, 300);
+    ).slice(0, 600);
 
     const components: ParsedComponent[] = [];
     const render_configs: Record<string, RenderConfig> = {};
@@ -129,36 +135,61 @@ export async function scanRepo(
     }
 
     // Pass 2: opportunistically fetch non-component siblings referenced by
-    // relative imports in the primary sources. Only pay for files that are
-    // actually needed; cap total extra fetches.
-    const neededSiblings = new Set<string>();
-    for (const [path, src] of sources) {
-      const dir = path.split('/').slice(0, -1).join('/');
-      const re = /(?:from|import)\s*['"](\.[^'"]+)['"]/g;
+    // relative OR aliased imports in the primary sources. Transitively
+    // follow newly-fetched files up to a depth of 3 so deep import chains
+    // (e.g. ui/button → lib/utils → registry/config) are captured.
+    async function enqueueReferenced(src: string, fromDir: string, bag: Set<string>) {
+      // Relative imports.
+      const reRel = /(?:from|import)\s*['"](\.[^'"]+)['"]/g;
       let m: RegExpExecArray | null;
-      while ((m = re.exec(src)) !== null) {
-        const rel = m[1];
-        const joined = joinRel(dir, rel);
+      while ((m = reRel.exec(src)) !== null) {
+        const joined = joinRel(fromDir, m[1]);
         for (const ext of ['', '.ts', '.tsx', '.js', '.jsx', '/index.ts', '/index.tsx']) {
           const candidate = joined + ext;
           if (relatedFiles.has('/' + candidate)) break;
           const hit = siblingFiles.find((f) => f.path === candidate);
-          if (hit) {
-            neededSiblings.add(hit.path);
-            break;
+          if (hit) { bag.add(hit.path); break; }
+        }
+      }
+      // Aliased imports.
+      const reAlias = /(?:from|import)\s*['"]([^.\/'"][^'"]*)['"]/g;
+      let a: RegExpExecArray | null;
+      while ((a = reAlias.exec(src)) !== null) {
+        const spec = a[1];
+        const resolved = resolveAliasPath(spec, aliases);
+        if (!resolved) continue;
+        for (const joined of resolved) {
+          for (const ext of ['', '.ts', '.tsx', '.js', '.jsx', '/index.ts', '/index.tsx']) {
+            const candidate = joined + ext;
+            if (relatedFiles.has('/' + candidate)) break;
+            const hit = siblingFiles.find((f) => f.path === candidate);
+            if (hit) { bag.add(hit.path); break; }
           }
         }
       }
     }
+
+    const neededSiblings = new Set<string>();
+    for (const [path, src] of sources) {
+      const dir = path.split('/').slice(0, -1).join('/');
+      await enqueueReferenced(src, dir, neededSiblings);
+    }
     let extraFetched = 0;
-    for (const p of neededSiblings) {
-      if (extraFetched >= 120) break;
-      if (relatedFiles.has('/' + p)) continue;
-      try {
-        const src = await gh.getFile({ owner, name, branch: defaultBranch }, p);
-        relatedFiles.set('/' + p, src);
-        extraFetched++;
-      } catch { /* ignore */ }
+    const MAX_EXTRA = 400;
+    for (let depth = 0; depth < 3 && neededSiblings.size > 0 && extraFetched < MAX_EXTRA; depth++) {
+      const batch = Array.from(neededSiblings);
+      neededSiblings.clear();
+      for (const p of batch) {
+        if (extraFetched >= MAX_EXTRA) break;
+        if (relatedFiles.has('/' + p)) continue;
+        try {
+          const src = await gh.getFile({ owner, name, branch: defaultBranch }, p);
+          relatedFiles.set('/' + p, src);
+          extraFetched++;
+          const dir = p.split('/').slice(0, -1).join('/');
+          await enqueueReferenced(src, dir, neededSiblings);
+        } catch { /* ignore */ }
+      }
     }
 
     // Pass 3: parse each candidate with the enriched relatedFiles map.
@@ -172,7 +203,7 @@ export async function scanRepo(
       });
       const source = sources.get(entry.path);
       if (!source) continue;
-      const parsed = parseComponent({ filePath: entry.path, source, relatedFiles });
+      const parsed = parseComponent({ filePath: entry.path, source, relatedFiles, aliases });
       if (!parsed) continue;
       components.push(parsed);
       render_configs[parsed.slug] = buildRenderConfig(parsed);
@@ -278,4 +309,78 @@ function joinRel(dir: string, rel: string): string {
 
 function safeParseJson(s: string): { dependencies?: Record<string, string>; devDependencies?: Record<string, string>; peerDependencies?: Record<string, string> } | null {
   try { return JSON.parse(s); } catch { return null; }
+}
+
+/**
+ * Discover `compilerOptions.paths` across every tsconfig*.json in the repo
+ * and merge them into a single aliases map. Each alias key keeps its
+ * literal form minus the trailing `/*` so the parser can match import
+ * specifiers directly. Each value is a list of absolute FS prefixes
+ * (relative to repo root, no leading slash) in lookup order.
+ *
+ * Example output:
+ *   {
+ *     '@/': ['apps/www/', 'packages/ui/src/'],
+ *     'ui/': ['packages/ui/src/']
+ *   }
+ */
+async function loadAliases(
+  gh: GitHubClient,
+  repo: { owner: string; name: string; branch: string },
+  tree: Array<{ type: string; path: string; size?: number }>,
+): Promise<Record<string, string[]>> {
+  const tsconfigs = tree
+    .filter((t) => t.type === 'blob' && /(^|\/)tsconfig(\.[^/]+)?\.json$/.test(t.path))
+    .filter((t) => !/\bnode_modules\b/.test(t.path))
+    .slice(0, 15);
+  const aliases: Record<string, string[]> = {};
+  for (const p of tsconfigs) {
+    let raw: string;
+    try { raw = await gh.getFile(repo, p.path); } catch { continue; }
+    // Strip // line and /* block comments so JSON.parse tolerates tsconfigs.
+    const stripped = raw
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/(^|[^:])\/\/.*$/gm, '$1');
+    let json: { compilerOptions?: { baseUrl?: string; paths?: Record<string, string[]> } } | null = null;
+    try { json = JSON.parse(stripped); } catch { continue; }
+    const paths = json?.compilerOptions?.paths;
+    if (!paths) continue;
+    const baseUrl = (json?.compilerOptions?.baseUrl ?? '.').replace(/^\.\//, '').replace(/^\.$/, '');
+    const tsconfigDir = p.path.split('/').slice(0, -1).join('/');
+    // Absolute prefix (inside the repo) that baseUrl resolves to.
+    const rootPrefix = [tsconfigDir, baseUrl].filter(Boolean).join('/').replace(/\/$/, '');
+    for (const [key, targets] of Object.entries(paths)) {
+      // Accept `@/*` and `@/foo/*` style keys; normalise to `@/` etc.
+      const cleanKey = key.replace(/\*$/, '');
+      for (const t of targets) {
+        const cleanTarget = t.replace(/\*$/, '');
+        const prefix = [rootPrefix, cleanTarget].filter(Boolean).join('/').replace(/^\//, '').replace(/\/$/, '');
+        const normalized = prefix ? prefix + '/' : '';
+        if (!aliases[cleanKey]) aliases[cleanKey] = [];
+        if (!aliases[cleanKey].includes(normalized.replace(/\/$/, ''))) {
+          aliases[cleanKey].push(normalized.replace(/\/$/, ''));
+        }
+      }
+    }
+  }
+  // Ensure `@/` always maps to at least `src/` as a fallback (most common
+  // shadcn/Next.js convention) so we degrade gracefully when tsconfigs
+  // are unparseable or missing.
+  if (!aliases['@/']) aliases['@/'] = ['src', 'app', 'components'];
+  return aliases;
+}
+
+/**
+ * Given an import specifier and the alias map, return the list of
+ * candidate absolute-ish paths (no leading slash) it could resolve to,
+ * or null if the specifier isn't aliased.
+ */
+function resolveAliasPath(spec: string, aliases: Record<string, string[]>): string[] | null {
+  for (const key of Object.keys(aliases)) {
+    const stripped = key.endsWith('/') ? key.slice(0, -1) : key;
+    if (spec !== stripped && !spec.startsWith(stripped + '/')) continue;
+    const tail = spec.slice(stripped.length).replace(/^\//, '');
+    return aliases[key].map((prefix) => (prefix ? prefix + (tail ? '/' + tail : '') : tail));
+  }
+  return null;
 }

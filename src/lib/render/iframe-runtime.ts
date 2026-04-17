@@ -163,6 +163,16 @@ export const IFRAME_RUNTIME_SOURCE = /* js */ `
             if (hit) return { path: hit, namespace: 'vfs' };
             return { path: 'stub:' + p, namespace: 'stub' };
           }
+          // Absolute vfs paths (alias-rewritten by the parser).
+          if (p.charAt(0) === '/') {
+            const cands = [
+              p, p + '.ts', p + '.tsx', p + '.js', p + '.jsx',
+              p + '/index.ts', p + '/index.tsx', p + '/index.js', p + '/index.jsx',
+            ];
+            const ok = cands.find((c) => files[c] != null);
+            if (ok) return { path: ok, namespace: 'vfs' };
+            return { path: 'stub:' + p, namespace: 'stub' };
+          }
           // Bare imports → virtual shim referencing window.__autodsm_deps.
           return { path: p, namespace: 'bare' };
         });
@@ -312,6 +322,15 @@ export const IFRAME_RUNTIME_SOURCE = /* js */ `
             ];
             const hit = candidates.find((c) => files[c] != null);
             if (hit) return { path: hit, namespace: 'vfs' };
+            return { path: 'stub:' + p, namespace: 'stub' };
+          }
+          if (p.charAt(0) === '/') {
+            const cands = [
+              p, p + '.ts', p + '.tsx', p + '.js', p + '.jsx',
+              p + '/index.ts', p + '/index.tsx', p + '/index.js', p + '/index.jsx',
+            ];
+            const ok = cands.find((c) => files[c] != null);
+            if (ok) return { path: ok, namespace: 'vfs' };
             return { path: 'stub:' + p, namespace: 'stub' };
           }
           return { path: p, namespace: 'bare' };
