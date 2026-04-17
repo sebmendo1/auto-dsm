@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
+import { useScanStore } from '@/stores/scan';
 
 interface Progress {
   phase: string;
@@ -39,6 +40,9 @@ function ScanningInner() {
         if (data.phase === 'done') {
           es.close();
           setTimeout(() => {
+            // Drop cached scan so the dashboard refetches the freshly saved result
+            // (otherwise same-repo rescans keep stale tokens/components counts).
+            useScanStore.getState().clear();
             router.push(`/dashboard?repo=${encodeURIComponent(repo)}`);
           }, 500);
         } else if (data.phase === 'unsupported') {

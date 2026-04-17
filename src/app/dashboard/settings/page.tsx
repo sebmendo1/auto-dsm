@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useTheme } from 'next-themes';
-import { Check, Github, KeyRound, Moon, Sun, Trash2 } from 'lucide-react';
+import { Check, Github, KeyRound, LogOut, Moon, Sun, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useScanStore } from '@/stores/scan';
@@ -122,6 +122,19 @@ export default function SettingsPage() {
             {savedGemini ? <Check size={14} /> : 'Save'}
           </Button>
         </div>
+      </Section>
+
+      <Section
+        title="Account"
+        description="Session is managed by Supabase. Sign out on this device when you are done."
+      >
+        <a
+          href="/auth/signout"
+          className="inline-flex items-center gap-2 rounded-lg border border-t-default px-4 py-2.5 text-[14px] font-medium text-t-primary hover:bg-[var(--bg-tertiary)] transition-base w-fit"
+        >
+          <LogOut size={16} strokeWidth={1.5} className="text-t-tertiary" />
+          Sign out
+        </a>
       </Section>
 
       <Section

@@ -48,9 +48,11 @@ export default function ComponentDetailPage() {
             <TabsTrigger value="props">Props</TabsTrigger>
             <TabsTrigger value="source">Source</TabsTrigger>
           </TabsList>
-          <TabsContent value="demo" asChild>
+          {/* forceMount: inactive tabs normally unmount in Radix — that tore down the iframe and
+              forced a full preview rebuild every tab switch. Keep panels mounted so the session stays warm. */}
+          <TabsContent value="demo" asChild forceMount>
             <div
-              className="flex-1 relative dot-grid min-h-[480px]"
+              className="flex-1 relative dot-grid min-h-[480px] data-[state=inactive]:hidden"
               style={{ background: 'var(--bg-canvas)' }}
             >
               {status === 'error' && error ? (
@@ -86,10 +88,10 @@ export default function ComponentDetailPage() {
               )}
             </div>
           </TabsContent>
-          <TabsContent value="props" className="flex-1 overflow-auto">
+          <TabsContent value="props" forceMount className="flex-1 overflow-auto data-[state=inactive]:hidden">
             <PropsTable controls={renderConfig.prop_controls} />
           </TabsContent>
-          <TabsContent value="source" className="flex-1 overflow-hidden">
+          <TabsContent value="source" forceMount className="flex-1 overflow-hidden data-[state=inactive]:hidden">
             <SourceTab source={component.source_code} fileName={fileName} />
           </TabsContent>
         </Tabs>

@@ -42,15 +42,19 @@ export function Sidebar({ onToggle }: Props) {
           aria-label="Toggle sidebar"
           className="h-8 w-8 flex items-center justify-center rounded-md text-t-tertiary hover:text-t-primary hover:bg-[var(--bg-tertiary)] transition-base"
         >
-          <PanelLeft size={20} strokeWidth={1.5} />
+          <PanelLeft size={20} strokeWidth={2} />
         </button>
       </div>
 
       <nav className="px-3 flex flex-col gap-0.5">
-        <SidebarLink href="/dashboard/agent" icon={<Feather size={16} strokeWidth={1.5} />} active={pathname === '/dashboard/agent'}>
+        <SidebarLink
+          href="/dashboard/agent"
+          icon={<Feather size={16} strokeWidth={2} className="font-black" />}
+          active={pathname === '/dashboard/agent'}
+        >
           New agent
         </SidebarLink>
-        <SidebarLink href="/dashboard" icon={<Compass size={16} strokeWidth={1.5} />} active={pathname === '/dashboard'}>
+        <SidebarLink href="/dashboard" icon={<Compass size={16} strokeWidth={2} />} active={pathname === '/dashboard'}>
           Dashboard
         </SidebarLink>
       </nav>
@@ -114,7 +118,7 @@ export function Sidebar({ onToggle }: Props) {
           )}
         >
           <span className="text-t-tertiary">
-            <SettingsIcon size={16} strokeWidth={1.5} />
+            <SettingsIcon size={16} strokeWidth={2} />
           </span>
           <span>Settings</span>
         </Link>

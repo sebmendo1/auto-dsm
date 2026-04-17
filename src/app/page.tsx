@@ -31,8 +31,13 @@ export default function LandingPage() {
       return;
     }
     const normalized = `${ref.owner}/${ref.name}`;
-    try { sessionStorage.setItem('autodsm.pendingRepo', normalized); } catch {}
-    router.push(`/onboarding/scanning?repo=${encodeURIComponent(normalized)}`);
+    try {
+      sessionStorage.setItem('autodsm.pendingRepo', normalized);
+    } catch {
+      /* ignore */
+    }
+    const next = encodeURIComponent(`/onboarding/scanning?repo=${encodeURIComponent(normalized)}`);
+    router.push(`/login?next=${next}`);
   }
 
   return (
@@ -46,10 +51,10 @@ export default function LandingPage() {
           <Image
             src="/brand/autodsm-wordmark-light.svg"
             alt="autoDSM"
-            width={140}
-            height={28}
+            width={240}
+            height={48}
             priority
-            className="h-6 w-auto md:h-7"
+            className="h-12 w-fit"
           />
         </a>
         <nav className="hidden md:block mx-auto">

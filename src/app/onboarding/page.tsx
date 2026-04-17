@@ -19,7 +19,13 @@ export default function OnboardingPage() {
       return;
     }
     const normalized = `${ref.owner}/${ref.name}`;
-    router.push(`/onboarding/scanning?repo=${encodeURIComponent(normalized)}`);
+    try {
+      sessionStorage.setItem('autodsm.pendingRepo', normalized);
+    } catch {
+      /* ignore */
+    }
+    const next = encodeURIComponent(`/onboarding/scanning?repo=${encodeURIComponent(normalized)}`);
+    router.push(`/login?next=${next}`);
   }
 
   return (

@@ -30,7 +30,16 @@ const GROUPS: Group[] = [
   },
 ];
 
+function matchesAnyTypographyGroup(t: Token): boolean {
+  return GROUPS.some((g) => g.predicate(t));
+}
+
 export function TypographyPage({ tokens }: { tokens: Token[] }) {
+  const otherTypography = tokens
+    .filter((t) => !matchesAnyTypographyGroup(t))
+    .slice()
+    .sort((a, b) => a.name.localeCompare(b.name));
+
   return (
     <div className="flex flex-col gap-16 py-8">
       {GROUPS.map((g) => {
@@ -44,12 +53,34 @@ export function TypographyPage({ tokens }: { tokens: Token[] }) {
             </p>
             <ul className="mt-8 flex flex-col">
               {items.map((t, i) => (
-                <TypographyRow key={t.name} token={t} last={i === items.length - 1} />
+                <TypographyRow
+                  key={`${g.title}-${t.name}-${t.value}-${i}`}
+                  token={t}
+                  last={i === items.length - 1}
+                />
               ))}
             </ul>
           </section>
         );
       })}
+      {otherTypography.length > 0 ? (
+        <section>
+          <h1 className="font-display font-bold text-[28px] text-t-primary">Other typography</h1>
+          <p className="mt-2 text-[15px] leading-[22px] text-t-secondary max-w-[640px]">
+            Line heights, font weights, families, and scale tokens that did not match the heading, body, or
+            utility heuristics — everything else extracted as typography from your repo.
+          </p>
+          <ul className="mt-8 flex flex-col">
+            {otherTypography.map((t, i) => (
+              <TypographyRow
+                key={`other-${t.name}-${t.value}-${t.source_file ?? ''}-${i}`}
+                token={t}
+                last={i === otherTypography.length - 1}
+              />
+            ))}
+          </ul>
+        </section>
+      ) : null}
     </div>
   );
 }
@@ -58,16 +89,21 @@ function TypographyRow({ token }: { token: Token; last: boolean }) {
   const [text, setText] = useState('the fox jumped over the lazy dog');
   const [editing, setEditing] = useState(false);
 
-  // Parse raw value best-effort — Tailwind fontSize comes as `[size, lineHeight]`
-  // or just `size`. CSS vars are atomic values.
-  const { fontSize, lineHeight } = parseSize(token.value);
-  const { fontFamily, weight, letterSpacing } = parseMeta(token);
+  const inferred = inferTypographyFields(token);
+  const fromSize = parseSize(token.value);
+  const meta = parseMeta(token);
+
+  const fontFamily = inferred.fontFamily ?? meta.fontFamily;
+  const fontSize = inferred.fontSize ?? fromSize.fontSize;
+  const lineHeight = inferred.lineHeight ?? fromSize.lineHeight;
+  const letterSpacing = inferred.letterSpacing ?? meta.letterSpacing;
+  const fontWeight = inferred.fontWeight ?? meta.weight;
 
   const style = {
     fontFamily: fontFamily ?? 'var(--font-display)',
     fontSize,
     lineHeight,
-    fontWeight: weight,
+    fontWeight,
     letterSpacing,
   } as const;
 
@@ -83,7 +119,7 @@ function TypographyRow({ token }: { token: Token; last: boolean }) {
           <dt className="text-t-secondary">Line Height</dt>
           <dd className="text-t-primary">{lineHeight ?? '—'}</dd>
           <dt className="text-t-secondary">Letter Spacing</dt>
-          <dd className="text-t-primary">{letterSpacing ?? '0'}</dd>
+          <dd className="text-t-primary">{letterSpacing ?? '—'}</dd>
         </dl>
       </div>
       <div className="flex items-center">
@@ -113,6 +149,40 @@ function TypographyRow({ token }: { token: Token; last: boolean }) {
   );
 }
 
+/**
+ * Map Tailwind / CSS token shape to preview fields (fontSize tuple vs lineHeight-only keys, etc.).
+ */
+function inferTypographyFields(token: Token): {
+  fontFamily?: string;
+  fontSize?: string;
+  lineHeight?: string;
+  letterSpacing?: string;
+  fontWeight?: number;
+} {
+  const name = token.name.toLowerCase().replace(/_/g, '-');
+  const v = token.value.trim();
+  const g = (token.group ?? '').toLowerCase();
+
+  if (g === 'lineheight' || /(^|-)leading(-|$)/.test(name) || name.includes('line-height')) {
+    return { lineHeight: v };
+  }
+  if (g === 'letterspacing' || /(^|-)tracking(-|$)/.test(name) || name.includes('letter-spacing')) {
+    return { letterSpacing: v };
+  }
+  if (g === 'fontweight' || name.includes('font-weight') || (name.endsWith('weight') && /^\d+$/.test(v))) {
+    const w = Number.parseInt(v, 10);
+    return Number.isFinite(w) ? { fontWeight: w } : {};
+  }
+  if (
+    g === 'family' ||
+    name.includes('font-family') ||
+    /^font-(?!weight|size|feature|variant|stretch|style)(?:[\w-]+)?$/i.test(token.name)
+  ) {
+    return { fontFamily: v };
+  }
+  return {};
+}
+
 function parseSize(value: string): { fontSize?: string; lineHeight?: string } {
   if (!value) return {};
   const trimmed = value.trim().replace(/^\[|\]$/g, '');
@@ -121,7 +191,11 @@ function parseSize(value: string): { fontSize?: string; lineHeight?: string } {
   return { fontSize: trimmed };
 }
 
-function parseMeta(token: Token): { fontFamily?: string; weight?: number; letterSpacing?: string } {
+function parseMeta(token: Token): {
+  fontFamily?: string;
+  weight?: number;
+  letterSpacing?: string;
+} {
   const lower = token.name.toLowerCase();
   const weight =
     /bold/.test(lower) ? 700 :

@@ -29,5 +29,7 @@ export const useScanStore = create<ScanStore>((set, get) => ({
       set({ error: String((err as Error).message ?? err), loading: false });
     }
   },
-  clear() { set({ repo: null, result: null, error: null }); },
+  clear() {
+    set({ repo: null, result: null, error: null, loading: false });
+  },
 }));

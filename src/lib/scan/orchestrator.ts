@@ -273,21 +273,7 @@ export async function scanRepo(
 
     // ─── Tokens ───────────────────────────────────────────────────────
     emit({ phase: 'tokens', message: 'Extracting design tokens…' });
-    const tokenFilePaths = tree
-      .filter((t) =>
-        t.type === 'blob' &&
-        (t.path.endsWith('tailwind.config.ts') ||
-          t.path.endsWith('tailwind.config.js') ||
-          t.path.endsWith('tailwind.config.cjs') ||
-          t.path.endsWith('tailwind.config.mjs') ||
-          /\.tokens\.json$/.test(t.path) ||
-          /tokens\/[^/]+\.json$/.test(t.path) ||
-          t.path.endsWith('globals.css') ||
-          t.path.endsWith('global.css') ||
-          /app\/.*\.css$/.test(t.path) ||
-          /styles\/.*\.css$/.test(t.path)),
-      )
-      .slice(0, 10);
+    const tokenFilePaths = selectTokenFilesForExtraction(tree);
 
     const tokenFiles: Record<string, string> = {};
     for (const p of tokenFilePaths) {
@@ -343,6 +329,83 @@ function buildRenderConfig(parsed: ParsedComponent): RenderConfig {
     prop_controls: parsed.props,
     presets: parsed.presets,
   };
+}
+
+/** Max files pulled for token extraction (typography + other categories). */
+const MAX_TOKEN_FILES = 45;
+/** Soft cap on estimated bytes to keep scans fast and under rate limits. */
+const MAX_TOKEN_FETCH_BYTES = 450_000;
+
+type TokenTreeEntry = { path: string; type: string; size?: number };
+
+/**
+ * Prioritise Tailwind configs and global/theme CSS, then other app CSS/SCSS,
+ * so extractTokens sees real typography sources (not only the first 10 paths).
+ */
+function selectTokenFilesForExtraction(tree: TokenTreeEntry[]): TokenTreeEntry[] {
+  const candidates = tree.filter(
+    (t) => t.type === 'blob' && isTokenCandidatePath(t.path, t.size),
+  );
+  const scored = candidates.map((t) => ({
+    t,
+    score: tokenPathScore(t.path),
+    estBytes: t.size != null && t.size > 0 ? Math.min(t.size, 200_000) : 48_000,
+  }));
+  scored.sort((a, b) => b.score - a.score || a.t.path.localeCompare(b.t.path));
+  const out: TokenTreeEntry[] = [];
+  let bytes = 0;
+  for (const { t, estBytes } of scored) {
+    if (out.length >= MAX_TOKEN_FILES) break;
+    if (bytes + estBytes > MAX_TOKEN_FETCH_BYTES && out.length >= 12) break;
+    out.push(t);
+    bytes += estBytes;
+  }
+  return out;
+}
+
+function isTokenCandidatePath(path: string, size?: number): boolean {
+  if (size != null && size > 350_000) return false;
+  if (/node_modules|\.next\b|\/dist\/|\/build\/|\/out\/|\/coverage\/|\.git\b/i.test(path)) {
+    return false;
+  }
+  if (/tailwind\.config\.(ts|js|cjs|mjs)$/.test(path)) return true;
+  if (/\.tokens\.json$/i.test(path)) return true;
+  if (/\/tokens\/[^/]+\.json$/i.test(path)) return true;
+  if (/\.(css|scss)$/i.test(path)) {
+    if (!path.includes('/')) return true;
+    // Root-level app folders (Next/Vite single-package repos).
+    if (/^(src|app|packages|styles|public|lib)\//i.test(path)) return true;
+    // Turborepo / monorepo: apps/<pkg>/src/... or apps/<pkg>/app/...
+    if (/^apps\/[^/]+\/(src|app|packages|styles|public|lib)\//i.test(path)) return true;
+    // Design tokens often live under any .../src/...css (packages, nested apps).
+    if (/\/src\/[^/].*\.(css|scss)$/i.test(path)) return true;
+    // Tailwind v4 / Next: globals.css may sit only under apps/.../app/
+    if (/\/globals?\.css$/i.test(path)) return true;
+    if (/\/index\.css$/i.test(path)) return true;
+    return false;
+  }
+  return false;
+}
+
+function tokenPathScore(path: string): number {
+  const p = path.toLowerCase();
+  if (/tailwind\.config\.(ts|js|cjs|mjs)$/.test(p)) return 120;
+  if (/(^|\/)globals?\.css$/.test(p)) return 110;
+  if (/^app\/globals?\.css$/.test(p)) return 108;
+  if (/^src\/app\/globals?\.css$/.test(p)) return 107;
+  if (/^apps\/[^/]+\/src\/app\/globals?\.css$/.test(p)) return 106;
+  if (/^apps\/[^/]+\/app\/globals?\.css$/.test(p)) return 105;
+  if (/^src\/index\.css$/.test(p)) return 95;
+  if (/^src\/styles?\//.test(p)) return 88;
+  if (/^styles?\//.test(p)) return 85;
+  if (/^app\/.*\.(css|scss)$/.test(p)) return 82;
+  if (/^packages\/.*\.(css|scss)$/.test(p)) return 78;
+  if (/^src\/.*\.(css|scss)$/.test(p)) return 72;
+  if (/^apps\/.*\/(src|app)\/.*\.(css|scss)$/.test(p)) return 70;
+  if (/^lib\/.*\.(css|scss)$/.test(p)) return 65;
+  if (/\.tokens\.json$/.test(p) || /\/tokens\//.test(p)) return 60;
+  if (/\.(css|scss)$/.test(p)) return 50;
+  return 0;
 }
 
 function looksLikeComponentFile(path: string): boolean {

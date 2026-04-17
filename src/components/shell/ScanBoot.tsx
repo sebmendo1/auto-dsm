@@ -27,6 +27,18 @@ export function ScanBoot({ children }: { children: React.ReactNode }) {
     }
   }, [params, repo, load, router]);
 
+  // Persist last opened repo for authenticated users (Supabase `user_preferences`).
+  useEffect(() => {
+    if (!result || !repo) return;
+    void fetch('/api/user/last-repo', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ repo }),
+    }).catch(() => {
+      /* non-fatal: table may not exist until migration is applied */
+    });
+  }, [result, repo]);
+
   if (error) {
     return (
       <div className="min-h-screen flex items-center justify-center text-center px-6">

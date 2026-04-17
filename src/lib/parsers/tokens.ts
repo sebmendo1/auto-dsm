@@ -77,6 +77,9 @@ function parseTailwindConfig(source: string, path: string): Token[] {
   out.push(...harvestKeyBlock(merged, 'colors', 'colors', path));
   out.push(...harvestKeyBlock(merged, 'fontSize', 'typography', path));
   out.push(...harvestKeyBlock(merged, 'fontFamily', 'typography', path, { group: 'family' }));
+  out.push(...harvestKeyBlock(merged, 'lineHeight', 'typography', path, { group: 'lineHeight' }));
+  out.push(...harvestKeyBlock(merged, 'letterSpacing', 'typography', path, { group: 'letterSpacing' }));
+  out.push(...harvestKeyBlock(merged, 'fontWeight', 'typography', path, { group: 'fontWeight' }));
   out.push(...harvestKeyBlock(merged, 'spacing', 'spacing', path));
   out.push(...harvestKeyBlock(merged, 'borderRadius', 'radii', path));
   out.push(...harvestKeyBlock(merged, 'borderWidth', 'borders', path));
@@ -149,6 +152,24 @@ function parseKVPairs(
       source_file: source,
     });
   }
+  // Tailwind theme often uses unquoted numbers for fontWeight / lineHeight / letterSpacing.
+  if (
+    category === 'typography' &&
+    (!group || group === 'fontWeight' || group === 'lineHeight' || group === 'letterSpacing')
+  ) {
+    const numRx =
+      /['"]?([\w.-]+)['"]?\s*:\s*([-+]?\d+(?:\.\d+)?)(?=\s*(?:,|}|$|\r|\n))/g;
+    let nm;
+    while ((nm = numRx.exec(body))) {
+      out.push({
+        category,
+        group,
+        name: nm[1],
+        value: nm[2],
+        source_file: source,
+      });
+    }
+  }
   // nested objects like colors.primary = { 500: '#...' }
   const nestedRx = /['"]?([\w.-]+)['"]?\s*:\s*{([^{}]*)}/g;
   let nm;
@@ -216,10 +237,29 @@ function parseCssVariables(source: string, path: string): Token[] {
 
 function classifyValue(name: string, value: string): TokenCategory {
   const n = name.toLowerCase();
+  const v = value.trim();
+
+  // Typography-first: many repos use --text-* for font sizes; --text-* + color value is semantic text color.
+  if (
+    /font-family|font-size|line-height|letter-spacing|font-weight|font-feature|--font-|--leading-|--tracking-/.test(
+      n,
+    ) ||
+    /^--text-(xs|sm|base|lg|xl|[2-9]xl)$/.test(n) ||
+    (/^--text-/i.test(name) && !isColor(v) && /(rem|em|px|ex|ch|%|calc\b|clamp\b)/i.test(v))
+  ) {
+    return 'typography';
+  }
+  if ((/leading|tracking/.test(n) || /^line-height$/i.test(name)) && !isColor(v)) {
+    return 'typography';
+  }
+  if (/^--text-/i.test(name) && isColor(v)) {
+    return 'colors';
+  }
+
   if (/color|bg|text|border|accent|fg|shadow|success|error|warning|info/.test(n)) {
     if (/shadow/.test(n)) return 'shadows';
-    if (isColor(value)) return 'colors';
-    if (/shadow/i.test(value)) return 'shadows';
+    if (isColor(v)) return 'colors';
+    if (/shadow/i.test(v)) return 'shadows';
   }
   if (/radius|rounded/.test(n)) return 'radii';
   if (/shadow/.test(n)) return 'shadows';
@@ -229,7 +269,7 @@ function classifyValue(name: string, value: string): TokenCategory {
   if (/breakpoint|screen/.test(n)) return 'breakpoints';
   if (/z(-|_)?index/.test(n)) return 'z-index';
   if (/border(?!-radius)/.test(n)) return 'borders';
-  if (isColor(value)) return 'colors';
+  if (isColor(v)) return 'colors';
   return 'spacing'; // sensible fallback
 }
 
@@ -269,7 +309,9 @@ function mapDtcgCategory(type?: string): TokenCategory {
     case 'color': return 'colors';
     case 'fontFamily':
     case 'fontSize':
-    case 'fontWeight': return 'typography';
+    case 'fontWeight':
+    case 'lineHeight':
+    case 'letterSpacing': return 'typography';
     case 'shadow': return 'shadows';
     case 'duration': return 'motion';
     case 'dimension':
