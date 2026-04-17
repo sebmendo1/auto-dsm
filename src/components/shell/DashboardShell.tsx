@@ -7,10 +7,10 @@ import Image from 'next/image';
 import { Sidebar } from '@/components/shell/Sidebar';
 
 /**
- * Responsive dashboard shell.
- * - Desktop: persistent 240px sidebar
- * - Mobile/tablet (<md): sidebar collapses into a drawer that opens via a
- *   hamburger in a compact top bar. The drawer auto-closes on route change.
+ * Responsive dashboard shell — three breakpoints per the master spec.
+ *   <1024   : sidebar hidden behind a hamburger drawer.
+ *   1024–1280 : 52px icon-rail by default, expands to the full 240px on hover.
+ *   >=1280  : persistent 240px sidebar.
  */
 export function DashboardShell({ children }: { children: React.ReactNode }) {
   const [open, setOpen] = useState(false);
@@ -30,13 +30,25 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex min-h-screen surface-primary">
-      {/* Desktop sidebar */}
-      <div className="hidden md:block">
+      {/* Full sidebar at xl (>=1280). */}
+      <div className="hidden xl:block">
         <Sidebar />
       </div>
 
-      {/* Mobile top bar */}
-      <div className="md:hidden fixed top-0 inset-x-0 z-40 h-12 flex items-center justify-between px-3 surface-primary border-b border-t-default">
+      {/* Icon-rail at lg (1024-1280). Reserves 52px in the layout and flies out
+          to 240px on hover without shifting the main content. */}
+      <aside className="hidden lg:block xl:hidden relative w-[52px] shrink-0 z-30">
+        <div
+          className="absolute inset-y-0 left-0 w-[52px] hover:w-[240px] transition-[width] duration-200 overflow-hidden border-r border-t-default surface-primary hover:shadow-lg"
+        >
+          <div className="w-[240px] h-full">
+            <Sidebar />
+          </div>
+        </div>
+      </aside>
+
+      {/* Mobile top bar (<lg). */}
+      <div className="lg:hidden fixed top-0 inset-x-0 z-40 h-12 flex items-center justify-between px-3 surface-primary border-b border-t-default">
         <button
           onClick={() => setOpen(true)}
           aria-label="Open navigation"
@@ -61,9 +73,9 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         <div className="w-8" />
       </div>
 
-      {/* Mobile drawer */}
+      {/* Mobile drawer (<lg). */}
       {open && (
-        <div className="md:hidden fixed inset-0 z-50 flex">
+        <div className="lg:hidden fixed inset-0 z-50 flex">
           <div
             className="absolute inset-0 bg-black/40"
             onClick={() => setOpen(false)}
@@ -86,9 +98,9 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         </div>
       )}
 
-      <div className="flex-1 min-w-0 pt-12 md:pt-4 px-2 md:pr-4 md:pl-0 pb-2 md:pb-4">
+      <div className="flex-1 min-w-0 pt-12 lg:pt-4 px-2 lg:pr-4 lg:pl-0 pb-2 lg:pb-4">
         <div
-          className="min-h-[calc(100vh-64px)] md:h-[calc(100vh-32px)] rounded-xl md:rounded-2xl border border-t-default flex flex-col overflow-hidden"
+          className="min-h-[calc(100vh-64px)] lg:h-[calc(100vh-32px)] rounded-xl lg:rounded-2xl border border-t-default flex flex-col overflow-hidden"
           style={{ background: 'var(--bg-secondary)' }}
         >
           {children}
