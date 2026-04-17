@@ -8,7 +8,11 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "test:extract-tokens": "npx --yes tsx@4 scripts/test-extract-tokens-typography.ts"
+    "test:extract-tokens": "npx --yes tsx@4 scripts/test-extract-tokens-typography.ts",
+    "supabase": "supabase",
+    "supabase:link": "supabase link",
+    "supabase:config:push": "supabase config push",
+    "supabase:secrets:list": "supabase secrets list"
   },
   "dependencies": {
     "@babel/parser": "^7.25.6",
