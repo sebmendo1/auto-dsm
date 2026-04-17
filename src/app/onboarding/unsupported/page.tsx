@@ -20,6 +20,28 @@ function UnsupportedInner() {
   const repo = params.get('repo') ?? '';
   const [email, setEmail] = useState('');
   const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
+  async function submitWaitlist() {
+    if (!email || submitting) return;
+    setSubmitting(true);
+    setSubmitError(null);
+    try {
+      const res = await fetch('/api/waitlist', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ email, framework: humanizeReason(reason), repo }),
+      });
+      const body = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+      if (!res.ok || !body.ok) throw new Error(body.error ?? 'unknown');
+      setSubmitted(true);
+    } catch (e) {
+      setSubmitError(e instanceof Error ? e.message : 'unknown');
+    } finally {
+      setSubmitting(false);
+    }
+  }
 
   return (
     <main className="min-h-screen flex items-center justify-center surface-primary px-4">
@@ -44,11 +66,16 @@ function UnsupportedInner() {
             />
             <Button
               size="lg"
-              onClick={() => { setSubmitted(true); /* TODO: POST to waitlist */ }}
-              disabled={!email}
+              onClick={submitWaitlist}
+              disabled={!email || submitting}
             >
-              Notify me
+              {submitting ? 'Sending…' : 'Notify me'}
             </Button>
+            {submitError && (
+              <p className="text-center text-[12px]" style={{ color: 'var(--error)' }}>
+                Couldn&apos;t submit. Please try again.
+              </p>
+            )}
           </div>
         ) : (
           <p className="mt-6 text-center text-[13px] text-t-secondary">

@@ -54,12 +54,12 @@ export default function DashboardPage() {
             <p className="text-[13px] text-t-tertiary">No commits retrieved.</p>
           ) : (
             <ul>
-              {result.commits.map((c, i) => (
+              {result.commits.slice(0, 6).map((c, i, arr) => (
                 <li
                   key={c.sha}
                   className={
                     'flex items-center justify-between gap-3 py-3 min-w-0 ' +
-                    (i < result.commits.length - 1 ? 'border-b border-t-subtle' : '')
+                    (i < arr.length - 1 ? 'border-b border-t-subtle' : '')
                   }
                 >
                   <a
