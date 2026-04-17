@@ -218,15 +218,32 @@ export const IFRAME_RUNTIME_SOURCE = /* js */ `
 
         // Stub module for unresolved relative imports.
         // Emits explicit named exports so esbuild's static analysis is
-        // satisfied; each exported name is the same tolerant Proxy.
+        // satisfied. Each exported name is a tolerant Proxy that:
+        //   - Returns itself for any property access (ctx.foo.bar => Proxy)
+        //   - Returns itself when called (useHook() => Proxy, not null)
+        //   - Supports iterator protocol (const [a,b] = useState() => [Proxy, Proxy])
+        //   - Renders as null when used as a React child
         build.onLoad({ filter: /.*/, namespace: 'stub' }, (args) => {
           const orig = (args.pluginData && args.pluginData.originalSpec) || '';
           const need = importNames[orig] || [];
           const lines = [
-            'const proxy = new Proxy(function(){ return null; }, {',
-            "  get: (_, k) => k === '__esModule' ? true : proxy,",
-            '  apply: () => null,',
-            '});',
+            'function __mkProxy() {',
+            '  const target = function(){ return proxy; };',
+            "  target[Symbol.iterator] = function* () { while(true) yield proxy; };",
+            '  const proxy = new Proxy(target, {',
+            "    get: (t, k) => {",
+            "      if (k === '__esModule') return true;",
+            "      if (k === Symbol.iterator) return t[Symbol.iterator];",
+            "      if (k === Symbol.toPrimitive) return () => '';",
+            "      if (k === 'then') return undefined;",
+            '      return proxy;',
+            '    },',
+            '    apply: () => proxy,',
+            '    construct: () => ({}),',
+            '  });',
+            '  return proxy;',
+            '}',
+            'const proxy = __mkProxy();',
             'export default proxy;',
             "export const cn = (...a) => a.filter(Boolean).join(' ');",
           ];
@@ -417,14 +434,28 @@ export const IFRAME_RUNTIME_SOURCE = /* js */ `
         });
 
         // Stub with explicit named exports matching what user code imports.
+        // Tolerant proxy supports property access, calls, iteration, destructure.
         build.onLoad({ filter: /.*/, namespace: 'stub' }, (args) => {
           const orig = (args.pluginData && args.pluginData.originalSpec) || '';
           const need = importNames[orig] || [];
           const lines = [
-            'const proxy = new Proxy(function(){ return null; }, {',
-            "  get: (_, k) => k === '__esModule' ? true : proxy,",
-            '  apply: () => null,',
-            '});',
+            'function __mkProxy() {',
+            '  const target = function(){ return proxy; };',
+            "  target[Symbol.iterator] = function* () { while(true) yield proxy; };",
+            '  const proxy = new Proxy(target, {',
+            "    get: (t, k) => {",
+            "      if (k === '__esModule') return true;",
+            "      if (k === Symbol.iterator) return t[Symbol.iterator];",
+            "      if (k === Symbol.toPrimitive) return () => '';",
+            "      if (k === 'then') return undefined;",
+            '      return proxy;',
+            '    },',
+            '    apply: () => proxy,',
+            '    construct: () => ({}),',
+            '  });',
+            '  return proxy;',
+            '}',
+            'const proxy = __mkProxy();',
             'export default proxy;',
             "export const cn = (...a) => a.filter(Boolean).join(' ');",
           ];

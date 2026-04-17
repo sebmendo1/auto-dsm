@@ -92,7 +92,7 @@ export async function scanRepo(
     const aliases = await loadAliases(gh, { owner, name, branch: defaultBranch }, tree);
 
     // ─── Component candidates ─────────────────────────────────────────
-    const tsxFiles = tree.filter(
+    const tsxFilesRaw = tree.filter(
       (t) =>
         t.type === 'blob' &&
         t.path.endsWith('.tsx') &&
@@ -101,6 +101,37 @@ export async function scanRepo(
         (t.size ?? 0) < 60_000 &&
         looksLikeComponentFile(t.path),
     );
+    // Sort component candidates by likelihood of being a renderable primitive.
+    // Atomic UI primitives (under registry/**/ui/, packages/**/ui/, src/ui/,
+    // components/ui/) tend to be self-contained and render cleanly. App-level
+    // composites (pages, demos, settings panels) require provider context
+    // and rarely render standalone. Sort-stable on score, then path length
+    // (shorter paths usually = more primitive components).
+    function componentScore(p: string): number {
+      let score = 0;
+      // Strongest signal: shadcn-style atomic primitives.
+      if (/\/registry\/[^/]+\/ui\//.test(p)) score += 100;
+      if (/\/components\/ui\//.test(p)) score += 90;
+      if (/\/packages\/[^/]+\/src\/ui\//.test(p)) score += 85;
+      if (/\/packages\/[^/]+\/ui\//.test(p)) score += 80;
+      if (/\/src\/ui\//.test(p)) score += 75;
+      // Medium: generic component folders.
+      if (/\/components\//.test(p)) score += 40;
+      // Filename lowercase = likely kebab/atom (shadcn convention).
+      const base = p.split('/').pop() || '';
+      if (/^[a-z][a-z0-9-]*\.tsx$/.test(base)) score += 20;
+      // Penalize deep / example / demo / app folders.
+      if (/\/apps?\//.test(p)) score -= 30;
+      if (/\/(demos?|examples?|playground|docs?)\//.test(p)) score -= 50;
+      if (/\/pages?\//.test(p)) score -= 40;
+      // Depth penalty — deeper = more likely to be a composite.
+      score -= (p.split('/').length - 1) * 2;
+      return score;
+    }
+    const tsxFiles = tsxFilesRaw
+      .map((t) => ({ t, s: componentScore(t.path) }))
+      .sort((a, b) => b.s - a.s || a.t.path.length - b.t.path.length)
+      .map((x) => x.t);
 
     // Build a local-files map for relative-import resolution during parsing.
     // We pre-populate it with *every* .ts/.tsx under src or packages (capped)
