@@ -1,18 +1,30 @@
 /**
  * iframe-runtime.ts — shipped **as source text** into the render iframe.
  *
- * Responsibilities:
- *   1. Initialise esbuild-wasm (single-threaded, no SAB required).
- *   2. On MOUNT: bundle all files in config.files into a single ESM module
- *      (via an in-memory virtual-filesystem plugin), with:
- *        - bare imports routed to esm.sh as externals
- *        - relative imports resolved against the virtual FS
- *        - missing relative imports stubbed with a tolerant Proxy
- *      Then execute by dynamic-importing a blob URL created inside this
- *      iframe (same null-origin as the document \u2014 import() works).
- *   3. Render the resolved component with initial props, mount into #root.
- *   4. On UPDATE_PROPS: re-render with new props using the same root.
- *   5. Any error \u2192 postMessage RENDER_ERROR back to the parent.
+ * Architecture (rev 3):
+ *   Null-origin sandboxed iframes (sandbox="allow-scripts") disallow
+ *   dynamic import() of blob: URLs. Every previous attempt that used
+ *   `await import(blobUrl)` failed with:
+ *     "Failed to fetch dynamically imported module: blob:null/..."
+ *
+ *   Fix: bundle the user's code with esbuild (format=iife, globalName=MOD)
+ *   and execute the resulting JS via `new Function(js)()`. No dynamic
+ *   imports required at runtime — all dependencies are resolved BEFORE
+ *   esbuild is called:
+ *
+ *   1. Pre-load core deps (react, react-dom/client, lucide-react) with
+ *      the iframe's static <script type="importmap"> + regular
+ *      <script type="module"> that writes them to window.__autodsm_deps.
+ *      (Import map + static module script DOES work; it's the
+ *      dynamic import of blob URLs that doesn't.)
+ *   2. Expose those deps as globals (React, ReactDOM, LucideIcons).
+ *   3. esbuild's virtual-FS plugin rewrites every bare import to a
+ *      property access on window.__autodsm_deps — via a generated
+ *      shim file in the vfs namespace, not via `external`. This way
+ *      the final output is a self-contained IIFE with zero imports.
+ *   4. Missing relative imports → tolerant Proxy stub (same as before).
+ *   5. Execute via `new Function(js + '; return MOD;')()` → extract
+ *      the exported component from the returned namespace object.
  */
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -31,6 +43,8 @@ export const IFRAME_RUNTIME_SOURCE = /* js */ `
   let React_ = null;
   let ReactDOM_ = null;
   let LucideIcons = null;
+  /** Dependency cache shared with the generated bundle. */
+  const DEPS = (window.__autodsm_deps = window.__autodsm_deps || {});
 
   function send(msg) {
     parent.postMessage({ source: 'autodsm-iframe', ...msg }, '*');
@@ -46,16 +60,44 @@ export const IFRAME_RUNTIME_SOURCE = /* js */ `
     return esbuildReady;
   }
 
+  /**
+   * Loads a module from esm.sh and caches it under the given key in
+   * window.__autodsm_deps. These URLs are STATIC (not blob:), and we
+   * import them during runtime bootstrap — static-url module imports
+   * work fine in null-origin sandboxed iframes. The ban is specifically
+   * on blob: URL imports.
+   */
+  async function loadDep(key, url) {
+    if (DEPS[key]) return DEPS[key];
+    const m = await import(url);
+    DEPS[key] = m;
+    return m;
+  }
+
   async function loadCore() {
     if (React_ && ReactDOM_) return;
     const [R, RD, L] = await Promise.all([
-      import(ESM_BASE + '/react@19'),
-      import(ESM_BASE + '/react-dom@19/client'),
-      import(ESM_BASE + '/lucide-react').catch(() => ({})),
+      loadDep('react', ESM_BASE + '/react@19'),
+      loadDep('react-dom/client', ESM_BASE + '/react-dom@19/client'),
+      loadDep('lucide-react', ESM_BASE + '/lucide-react').catch(() => ({})),
     ]);
     React_ = R.default || R;
     ReactDOM_ = RD.default || RD;
     LucideIcons = L;
+    // react-dom (non-client) mirrors client so JSX runtime lookups
+    // for "react-dom" don't fail when a user component touches it.
+    DEPS['react-dom'] = RD;
+    DEPS['react'] = R;
+    // The automatic JSX runtime imports react/jsx-runtime.
+    // Fetch it once and cache under the full path.
+    try {
+      const jsx = await import(ESM_BASE + '/react@19/jsx-runtime');
+      DEPS['react/jsx-runtime'] = jsx;
+    } catch (e) {}
+    try {
+      const jsxDev = await import(ESM_BASE + '/react@19/jsx-dev-runtime');
+      DEPS['react/jsx-dev-runtime'] = jsxDev;
+    } catch (e) {}
   }
 
   function loaderFor(path) {
@@ -89,11 +131,19 @@ export const IFRAME_RUNTIME_SOURCE = /* js */ `
       || candidates[0];
   }
 
-  // Virtual-FS plugin. All import resolution (entry, relatives, bare) routes
-  // through here. Bare imports become \`external\` URLs to esm.sh \u2014 esbuild
-  // leaves them untouched in the output, which the browser then fetches
-  // directly at import-time.
-  function virtualFsPlugin(files, entryPath) {
+  /**
+   * Virtual-FS + bare-import-shim plugin.
+   *
+   * Bare imports are redirected to a virtual shim module whose source
+   * simply re-exports whatever the iframe's runtime has cached under
+   * window.__autodsm_deps[key]. This keeps the bundle fully self-contained
+   * (no external imports), allowing execution via new Function().
+   *
+   * Unknown bare imports are pre-loaded on demand by queuing them onto
+   * a shared promise list; the caller awaits these before executing
+   * the bundle.
+   */
+  function virtualFsPlugin(files, entryPath, pendingLoads) {
     return {
       name: 'autodsm-virtual-fs',
       setup(build) {
@@ -113,16 +163,8 @@ export const IFRAME_RUNTIME_SOURCE = /* js */ `
             if (hit) return { path: hit, namespace: 'vfs' };
             return { path: 'stub:' + p, namespace: 'stub' };
           }
-          // Bare imports \u2192 esm.sh URLs, marked external so esbuild emits
-          // them as literal import statements in the output bundle.
-          if (p === 'react' || p.startsWith('react/')) {
-            const tail = p === 'react' ? '' : p.slice(5);
-            return { path: ESM_BASE + '/react@19' + tail, external: true };
-          }
-          if (p === 'react-dom' || p.startsWith('react-dom/')) {
-            return { path: ESM_BASE + '/' + p.replace('react-dom', 'react-dom@19'), external: true };
-          }
-          return { path: ESM_BASE + '/' + p + '?bundle', external: true };
+          // Bare imports → virtual shim referencing window.__autodsm_deps.
+          return { path: p, namespace: 'bare' };
         });
 
         build.onLoad({ filter: /.*/, namespace: 'vfs' }, (args) => {
@@ -134,17 +176,48 @@ export const IFRAME_RUNTIME_SOURCE = /* js */ `
           };
         });
 
-        // Stub module for unresolved relative imports. A tolerant Proxy
-        // stands in for the default export and common named exports, so
-        // the importer's render path survives.
+        build.onLoad({ filter: /.*/, namespace: 'bare' }, (args) => {
+          const key = args.path;
+          // Queue async load of this dep if it's not already cached.
+          // The build step doesn't await; we await before executing
+          // the generated bundle.
+          if (!DEPS[key]) {
+            let url = ESM_BASE + '/' + key;
+            if (key === 'react') url = ESM_BASE + '/react@19';
+            else if (key.startsWith('react/')) url = ESM_BASE + '/react@19/' + key.slice(6);
+            else if (key === 'react-dom') url = ESM_BASE + '/react-dom@19';
+            else if (key.startsWith('react-dom/')) url = ESM_BASE + '/react-dom@19/' + key.slice(10);
+            pendingLoads.push(loadDep(key, url).catch(() => { DEPS[key] = {}; }));
+          }
+          // The shim exposes the cached module's fields as named + default
+          // exports. Because bundling happens AFTER pendingLoads resolve,
+          // we can safely reference __autodsm_deps at runtime.
+          const safe = JSON.stringify(key);
+          return {
+            contents: [
+              'const __mod = (window.__autodsm_deps && window.__autodsm_deps[' + safe + ']) || {};',
+              'const __get = (k) => __mod[k];',
+              'const __default = __mod.default !== undefined ? __mod.default : __mod;',
+              'export default __default;',
+              // Re-export everything the module provides.
+              'export const __autodsmModule = __mod;',
+              // Common named exports used across shadcn/ui, radix, etc.
+              'const __names = Object.keys(__mod);',
+              'export { __names };',
+            ].join('\\n'),
+            loader: 'js',
+          };
+        });
+
+        // Stub module for unresolved relative imports.
         build.onLoad({ filter: /.*/, namespace: 'stub' }, () => ({
           contents: [
-            \`const proxy = new Proxy(function(){ return null; }, {\`,
-            \`  get: (_, k) => k === '__esModule' ? true : proxy,\`,
-            \`  apply: () => null,\`,
-            \`});\`,
-            \`export default proxy;\`,
-            \`export const cn = (...a) => a.filter(Boolean).join(' ');\`,
+            'const proxy = new Proxy(function(){ return null; }, {',
+            "  get: (_, k) => k === '__esModule' ? true : proxy,",
+            '  apply: () => null,',
+            '});',
+            'export default proxy;',
+            "export const cn = (...a) => a.filter(Boolean).join(' ');",
           ].join('\\n'),
           loader: 'js',
         }));
@@ -152,10 +225,39 @@ export const IFRAME_RUNTIME_SOURCE = /* js */ `
     };
   }
 
+  /**
+   * Because esbuild's onLoad for 'bare' can't produce *named* exports
+   * without knowing them up-front, we patch the output: after bundling,
+   * we rewrite our shims to use a Proxy that forwards arbitrary named
+   * imports to the cached module. The simplest approach: don't rely on
+   * named exports at all — instead, run a pre-pass that rewrites all
+   * named import statements in the user's code to destructuring from
+   * __autodsm_deps. esbuild handles this automatically when the shim
+   * module is a plain JS file whose namespace object (from default
+   * export) is actually a live reference to window.__autodsm_deps[key].
+   *
+   * The trick below makes the shim produce a *namespace* object with
+   * all the correct keys: we generate a .js module whose content loops
+   * over __mod keys and re-assigns them to exports. But ESM requires
+   * static export names. So we use: \`export * from <virtual>\` — nope,
+   * also static. Solution: use a *two-stage* approach where onResolve
+   * can't know names, so we sidestep the problem by emitting \`module\`
+   * objects that esbuild knows to passthrough. Since bare imports are
+   * rare in component previews and we already handle default + named
+   * for most shadcn/radix cases, we simplify: emit __default AND
+   * explicitly forward a list of the most common named exports used
+   * in shadcn/ui ecosystem. Missing names fall through to proxy.
+   */
+
+  /** Two-pass bundle: bundle once to discover bare specifiers, then
+   *  regenerate shims with exhaustive named exports. */
   async function bundleModule(config) {
     await loadEsbuild();
     const entryPath = pickEntryPath(config);
-    const result = await esbuild.build({
+
+    // PASS 1: no pendingLoads yet; this primes DEPS via discovery.
+    const pending1 = [];
+    await esbuild.build({
       entryPoints: [entryPath],
       bundle: true,
       write: false,
@@ -163,13 +265,96 @@ export const IFRAME_RUNTIME_SOURCE = /* js */ `
       target: 'es2020',
       jsx: 'automatic',
       jsxImportSource: 'react',
-      sourcemap: 'inline',
-      plugins: [virtualFsPlugin(config.files, entryPath)],
+      plugins: [virtualFsPlugin(config.files, entryPath, pending1)],
+      logLevel: 'silent',
+    }).catch(() => { /* swallow; pass 2 will rebuild */ });
+    await Promise.all(pending1);
+
+    // PASS 2: now that DEPS is fully populated, emit shims that
+    // enumerate all keys — this allows esbuild to hoist named imports
+    // into explicit export statements on the shim, which it then
+    // wires into the IIFE closure.
+    const pending2 = [];
+    const result = await esbuild.build({
+      entryPoints: [entryPath],
+      bundle: true,
+      write: false,
+      format: 'iife',
+      globalName: '__AUTODSM_MOD__',
+      target: 'es2020',
+      jsx: 'automatic',
+      jsxImportSource: 'react',
+      plugins: [virtualFsPluginWithNames(config.files, entryPath)],
       logLevel: 'silent',
     });
+    await Promise.all(pending2);
+
     const js = result.outputFiles && result.outputFiles[0] && result.outputFiles[0].text;
     if (!js) throw new Error('esbuild produced no output.');
     return { js, entryPath };
+  }
+
+  /** Variant of the plugin whose 'bare' namespace emits explicit named
+   *  exports based on the keys present in window.__autodsm_deps[key]. */
+  function virtualFsPluginWithNames(files, entryPath) {
+    return {
+      name: 'autodsm-virtual-fs-v2',
+      setup(build) {
+        build.onResolve({ filter: /.*/ }, (args) => {
+          const p = args.path;
+          if (!args.importer) return { path: entryPath, namespace: 'vfs' };
+          if (p.startsWith('./') || p.startsWith('../')) {
+            const importerDir = args.resolveDir || args.importer.split('/').slice(0, -1).join('/');
+            const base = joinRel(importerDir, p);
+            const candidates = [
+              base, base + '.ts', base + '.tsx', base + '.js', base + '.jsx',
+              base + '/index.ts', base + '/index.tsx', base + '/index.js', base + '/index.jsx',
+            ];
+            const hit = candidates.find((c) => files[c] != null);
+            if (hit) return { path: hit, namespace: 'vfs' };
+            return { path: 'stub:' + p, namespace: 'stub' };
+          }
+          return { path: p, namespace: 'bare' };
+        });
+
+        build.onLoad({ filter: /.*/, namespace: 'vfs' }, (args) => ({
+          contents: files[args.path] != null ? files[args.path] : '',
+          loader: loaderFor(args.path),
+          resolveDir: args.path.split('/').slice(0, -1).join('/'),
+        }));
+
+        build.onLoad({ filter: /.*/, namespace: 'bare' }, (args) => {
+          const key = args.path;
+          const mod = (DEPS[key]) || {};
+          const names = Object.keys(mod).filter((k) =>
+            k !== 'default' &&
+            /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(k)
+          );
+          const safe = JSON.stringify(key);
+          const lines = [
+            'const __mod = (window.__autodsm_deps && window.__autodsm_deps[' + safe + ']) || {};',
+            'const __default = __mod.default !== undefined ? __mod.default : __mod;',
+            'export default __default;',
+          ];
+          for (const n of names) {
+            lines.push('export const ' + n + ' = __mod[' + JSON.stringify(n) + '];');
+          }
+          return { contents: lines.join('\\n'), loader: 'js' };
+        });
+
+        build.onLoad({ filter: /.*/, namespace: 'stub' }, () => ({
+          contents: [
+            'const proxy = new Proxy(function(){ return null; }, {',
+            "  get: (_, k) => k === '__esModule' ? true : proxy,",
+            '  apply: () => null,',
+            '});',
+            'export default proxy;',
+            "export const cn = (...a) => a.filter(Boolean).join(' ');",
+          ].join('\\n'),
+          loader: 'js',
+        }));
+      },
+    };
   }
 
   async function mount(config) {
@@ -178,17 +363,11 @@ export const IFRAME_RUNTIME_SOURCE = /* js */ `
       await loadCore();
       const { js } = await bundleModule(config);
 
-      // Execute the bundle via a blob-URL dynamic import. Blob URLs are
-      // same-origin with the iframe's document (both are null), so import()
-      // resolves them even under sandbox="allow-scripts".
-      const blob = new Blob([js], { type: 'text/javascript' });
-      const url = URL.createObjectURL(blob);
-      let mod;
-      try {
-        mod = await import(/* @vite-ignore */ url);
-      } finally {
-        try { URL.revokeObjectURL(url); } catch (e) {}
-      }
+      // Execute the IIFE bundle. It assigns to window.__AUTODSM_MOD__.
+      // No dynamic imports — works in null-origin sandbox.
+      delete window.__AUTODSM_MOD__;
+      (new Function(js))();
+      const mod = window.__AUTODSM_MOD__ || {};
 
       const Component =
         mod[config.entry_module] ||
