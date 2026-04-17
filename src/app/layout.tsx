@@ -13,12 +13,18 @@ export const metadata: Metadata = {
   },
 };
 
-// Set the theme *before* paint to avoid a flash. Dark is the default.
+// Set the theme *before* paint to avoid a flash. Dark is the default;
+// 'system' resolves against prefers-color-scheme.
 const themeScript = `
 try {
   var t = localStorage.getItem('theme');
-  if (t === 'light') document.documentElement.classList.remove('dark');
-  else document.documentElement.classList.add('dark');
+  var resolved;
+  if (t === 'light') resolved = 'light';
+  else if (t === 'system') {
+    resolved = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  } else resolved = 'dark';
+  if (resolved === 'dark') document.documentElement.classList.add('dark');
+  else document.documentElement.classList.remove('dark');
 } catch (e) { document.documentElement.classList.add('dark'); }
 `;
 
@@ -40,7 +46,7 @@ export default function RootLayout({
         <ThemeProvider
           attribute="class"
           defaultTheme="dark"
-          enableSystem={false}
+          enableSystem
           disableTransitionOnChange
         >
           {children}
