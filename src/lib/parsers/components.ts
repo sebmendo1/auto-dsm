@@ -1,0 +1,454 @@
+/**
+ * Component parser — given a .tsx source string, pull out:
+ *   1. The exported component name (default export preferred; first named
+ *      React component otherwise).
+ *   2. The props interface/type, converted to PropControl[].
+ *   3. `cva`/`class-variance-authority` variants when present (these become
+ *      the "Configuration" presets).
+ *   4. Bare npm imports (for esm.sh resolution) + local relative imports
+ *      (for inlining in the render config).
+ *
+ * We use @babel/parser in TSX mode. It's forgiving enough to accept the
+ * *weird* stuff Lovable/v0/Cursor tends to generate. ts-morph is used only
+ * for slightly better type text extraction on prop interfaces.
+ *
+ * Error philosophy: never throw — always return *something* renderable.
+ * Unknown prop types collapse to {type: 'unknown', raw: <typeText>}.
+ */
+
+import { parse } from '@babel/parser';
+import _traverse from '@babel/traverse';
+// @babel/traverse ships a broken ESM default export; unwrap it.
+const traverse: typeof _traverse =
+  // @ts-expect-error — dual CJS/ESM
+  (_traverse as { default?: typeof _traverse }).default ?? _traverse;
+
+import type {
+  ExportDefaultDeclaration,
+  ExportNamedDeclaration,
+  FunctionDeclaration,
+  Identifier,
+  TSType,
+  VariableDeclarator,
+} from '@babel/types';
+import type { ParsedComponent, PropControl, PropControlType } from '../render/types';
+
+// ─── Public API ────────────────────────────────────────────────────────────
+
+export interface ParseOptions {
+  filePath: string;
+  /** Raw source of the .tsx file. */
+  source: string;
+  /** Best-effort map of relative import path → source, for local inlining. */
+  relatedFiles?: Map<string, string>;
+}
+
+export function parseComponent({ filePath, source, relatedFiles }: ParseOptions): ParsedComponent | null {
+  let ast;
+  try {
+    ast = parse(source, {
+      sourceType: 'module',
+      plugins: ['jsx', 'typescript', 'decorators-legacy', 'classProperties'],
+      errorRecovery: true,
+    });
+  } catch {
+    return null;
+  }
+
+  const state = {
+    imports: new Map<string, { defaultImport?: string; named: string[] }>(),
+    components: [] as { name: string; propsTypeRef?: string }[],
+    defaultExportName: undefined as string | undefined,
+    propsTypes: new Map<string, TypeShape>(),
+    cvaVariants: new Map<string, Record<string, string[]>>(),
+  };
+
+  traverse(ast, {
+    ImportDeclaration(path) {
+      const src = path.node.source.value;
+      const bucket = state.imports.get(src) ?? { named: [] };
+      for (const s of path.node.specifiers) {
+        if (s.type === 'ImportDefaultSpecifier') bucket.defaultImport = s.local.name;
+        if (s.type === 'ImportSpecifier') {
+          const imported = s.imported.type === 'Identifier' ? s.imported.name : s.imported.value;
+          bucket.named.push(imported);
+        }
+      }
+      state.imports.set(src, bucket);
+    },
+    TSInterfaceDeclaration(path) {
+      const name = path.node.id.name;
+      const shape: TypeShape = { kind: 'object', properties: [] };
+      for (const member of path.node.body.body) {
+        if (member.type === 'TSPropertySignature' && member.key.type === 'Identifier') {
+          shape.properties.push({
+            name: member.key.name,
+            optional: !!member.optional,
+            type: readTsType(member.typeAnnotation?.typeAnnotation),
+          });
+        }
+      }
+      state.propsTypes.set(name, shape);
+    },
+    TSTypeAliasDeclaration(path) {
+      const name = path.node.id.name;
+      state.propsTypes.set(name, { kind: 'raw', raw: typeText(path.node.typeAnnotation) });
+    },
+    VariableDeclarator(path) {
+      if (path.node.id.type !== 'Identifier') return;
+      const name = path.node.id.name;
+      const init = path.node.init;
+      if (!init) return;
+
+      // const Button = (props: Props) => <>...</>
+      if (init.type === 'ArrowFunctionExpression' || init.type === 'FunctionExpression') {
+        if (isLikelyComponentName(name)) {
+          const propsRef = extractPropsTypeRefFromParam(init.params[0]);
+          state.components.push({ name, propsTypeRef: propsRef });
+        }
+      }
+
+      // const buttonVariants = cva("base", { variants: { ... } })
+      if (
+        init.type === 'CallExpression' &&
+        init.callee.type === 'Identifier' &&
+        init.callee.name === 'cva'
+      ) {
+        const variants = extractCvaVariants(init);
+        if (variants) state.cvaVariants.set(name, variants);
+      }
+    },
+    FunctionDeclaration(path) {
+      const node = path.node as FunctionDeclaration;
+      if (node.id && isLikelyComponentName(node.id.name)) {
+        const propsRef = extractPropsTypeRefFromParam(node.params[0]);
+        state.components.push({ name: node.id.name, propsTypeRef: propsRef });
+      }
+    },
+    ExportDefaultDeclaration(path) {
+      const node = path.node as ExportDefaultDeclaration;
+      if (node.declaration.type === 'Identifier') {
+        state.defaultExportName = node.declaration.name;
+      } else if (
+        node.declaration.type === 'FunctionDeclaration' &&
+        node.declaration.id
+      ) {
+        state.defaultExportName = node.declaration.id.name;
+      }
+    },
+    ExportNamedDeclaration(path) {
+      const node = path.node as ExportNamedDeclaration;
+      if (node.declaration?.type === 'VariableDeclaration') {
+        for (const d of node.declaration.declarations) {
+          if (d.id.type === 'Identifier' && isLikelyComponentName(d.id.name)) {
+            // already recorded above in VariableDeclarator; nothing to do.
+          }
+        }
+      }
+    },
+  });
+
+  // Pick the primary component. default export wins; otherwise the first
+  // PascalCase name.
+  const primary =
+    state.components.find((c) => c.name === state.defaultExportName) ??
+    state.components[0];
+  if (!primary) return null;
+
+  // Build props
+  const propsShape = primary.propsTypeRef ? state.propsTypes.get(primary.propsTypeRef) : undefined;
+  const variantForComponent = findVariantsForComponent(primary.name, state.cvaVariants);
+
+  const props = buildPropControls(propsShape, variantForComponent);
+  const initial_props = buildInitialProps(props);
+  const presets = buildPresets(primary.name, variantForComponent, props);
+
+  // Imports → dependency buckets
+  const dependencies: Record<string, string> = {};
+  const localImports: ParsedComponent['local_imports'] = [];
+  for (const [src] of state.imports) {
+    if (src.startsWith('.') || src.startsWith('/')) {
+      const resolved = relatedFiles?.get(src) ?? relatedFiles?.get(src + '.tsx') ?? relatedFiles?.get(src + '.ts');
+      if (resolved) localImports.push({ from: src, resolved_path: src, source: resolved });
+    } else if (!src.startsWith('react') && src !== 'react-dom') {
+      dependencies[src] = 'latest';
+    }
+  }
+
+  return {
+    name: primary.name,
+    slug: slugify(primary.name),
+    file_path: filePath,
+    source_code: source,
+    props,
+    initial_props,
+    presets,
+    dependencies,
+    local_imports: localImports,
+  };
+}
+
+// ─── Type-shape plumbing ───────────────────────────────────────────────────
+
+type TypeShape =
+  | { kind: 'raw'; raw: string }
+  | {
+      kind: 'object';
+      properties: {
+        name: string;
+        optional: boolean;
+        type: { kind: PropControlType; raw?: string; values?: string[] };
+      }[];
+    };
+
+function readTsType(t: TSType | undefined | null): {
+  kind: PropControlType;
+  raw?: string;
+  values?: string[];
+} {
+  if (!t) return { kind: 'unknown' };
+  const raw = typeText(t);
+  switch (t.type) {
+    case 'TSBooleanKeyword':
+      return { kind: 'boolean', raw };
+    case 'TSStringKeyword':
+      return { kind: 'string', raw };
+    case 'TSNumberKeyword':
+      return { kind: 'number', raw };
+    case 'TSFunctionType':
+      return { kind: 'function', raw };
+    case 'TSUnionType': {
+      const lits = t.types.filter((x) => x.type === 'TSLiteralType');
+      if (lits.length && lits.length === t.types.length) {
+        const values = lits
+          .map((x) => {
+            // @ts-expect-error narrowed above
+            const lit = x.literal;
+            if (lit.type === 'StringLiteral') return lit.value;
+            return null;
+          })
+          .filter((v): v is string => !!v);
+        if (values.length) return { kind: 'enum', raw, values };
+      }
+      return { kind: 'unknown', raw };
+    }
+    case 'TSTypeReference': {
+      const nameNode = t.typeName;
+      const name = nameNode.type === 'Identifier' ? nameNode.name : 'ref';
+      if (name === 'ReactNode' || name === 'ReactElement' || name === 'JSX.Element') {
+        return { kind: 'node', raw };
+      }
+      return { kind: 'unknown', raw };
+    }
+    default:
+      return { kind: 'unknown', raw };
+  }
+}
+
+function typeText(t: TSType | null | undefined): string {
+  if (!t) return 'unknown';
+  // Light-weight serializer — good enough for prop labels.
+  switch (t.type) {
+    case 'TSStringKeyword': return 'string';
+    case 'TSNumberKeyword': return 'number';
+    case 'TSBooleanKeyword': return 'boolean';
+    case 'TSAnyKeyword': return 'any';
+    case 'TSUnknownKeyword': return 'unknown';
+    case 'TSVoidKeyword': return 'void';
+    case 'TSLiteralType': {
+      const lit = t.literal;
+      if (lit.type === 'StringLiteral') return `"${lit.value}"`;
+      if (lit.type === 'NumericLiteral') return String(lit.value);
+      if (lit.type === 'BooleanLiteral') return String(lit.value);
+      return '?';
+    }
+    case 'TSUnionType': return t.types.map(typeText).join(' | ');
+    case 'TSTypeReference': {
+      const n = t.typeName;
+      return n.type === 'Identifier' ? n.name : 'ref';
+    }
+    case 'TSFunctionType': return '(...args) => any';
+    case 'TSArrayType': return `${typeText(t.elementType)}[]`;
+    default: return t.type;
+  }
+}
+
+function extractPropsTypeRefFromParam(param: unknown): string | undefined {
+  if (!param) return undefined;
+  // @ts-expect-error — Babel union is wide
+  const anno = param.typeAnnotation?.typeAnnotation;
+  if (!anno) return undefined;
+  if (anno.type === 'TSTypeReference' && anno.typeName?.type === 'Identifier') {
+    return anno.typeName.name;
+  }
+  return undefined;
+}
+
+function extractCvaVariants(call: unknown): Record<string, string[]> | null {
+  // call is a CallExpression whose args[1] is an ObjectExpression with
+  // a property "variants" → ObjectExpression whose props are variant axes.
+  // @ts-expect-error — loose structural parse
+  const arg = call.arguments?.[1];
+  if (!arg || arg.type !== 'ObjectExpression') return null;
+  const variantsProp = arg.properties.find(
+    // @ts-expect-error
+    (p) => p.type === 'ObjectProperty' && p.key?.name === 'variants',
+  );
+  if (!variantsProp) return null;
+  // @ts-expect-error
+  const variantsObj = variantsProp.value;
+  if (variantsObj.type !== 'ObjectExpression') return null;
+  const out: Record<string, string[]> = {};
+  for (const p of variantsObj.properties) {
+    // @ts-expect-error
+    if (p.type !== 'ObjectProperty' || p.key?.type !== 'Identifier') continue;
+    // @ts-expect-error
+    const name = p.key.name;
+    // @ts-expect-error
+    if (p.value.type !== 'ObjectExpression') continue;
+    // @ts-expect-error
+    const keys: string[] = p.value.properties
+      .map((kp: { type: string; key?: { type: string; name?: string; value?: string } }) =>
+        kp.type === 'ObjectProperty' && kp.key
+          ? kp.key.type === 'Identifier'
+            ? kp.key.name
+            : kp.key.value
+          : null,
+      )
+      .filter((k: string | null) => k != null);
+    out[name] = keys;
+  }
+  return out;
+}
+
+function findVariantsForComponent(
+  _componentName: string,
+  allVariants: Map<string, Record<string, string[]>>,
+): Record<string, string[]> | null {
+  // shadcn convention: `buttonVariants` → `Button`. We take the first cva
+  // definition in the file as belonging to the primary component.
+  const first = allVariants.values().next();
+  return first.done ? null : first.value;
+}
+
+function buildPropControls(
+  shape: TypeShape | undefined,
+  variants: Record<string, string[]> | null,
+): PropControl[] {
+  const out: PropControl[] = [];
+
+  if (shape?.kind === 'object') {
+    for (const p of shape.properties) {
+      if (p.type.kind === 'enum') {
+        out.push({
+          name: p.name,
+          type: 'enum',
+          raw: p.type.raw,
+          values: p.type.values,
+          required: !p.optional,
+        });
+      } else {
+        out.push({
+          name: p.name,
+          type: p.type.kind,
+          raw: p.type.raw,
+          required: !p.optional,
+        });
+      }
+    }
+  }
+
+  // Merge cva variants — if a prop name matches an axis, upgrade it to enum
+  // with the discovered values.
+  if (variants) {
+    for (const [axis, values] of Object.entries(variants)) {
+      const existing = out.find((c) => c.name === axis);
+      if (existing) {
+        existing.type = 'enum';
+        existing.values = values;
+      } else {
+        out.push({
+          name: axis,
+          type: 'enum',
+          values,
+          required: false,
+        });
+      }
+    }
+  }
+
+  // Always expose children if not already present (most components want it).
+  if (!out.find((c) => c.name === 'children')) {
+    out.push({ name: 'children', type: 'node', required: false });
+  }
+
+  return out;
+}
+
+function buildInitialProps(controls: PropControl[]): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const c of controls) {
+    switch (c.type) {
+      case 'enum':
+        out[c.name] = c.values?.[0] ?? '';
+        break;
+      case 'boolean':
+        out[c.name] = false;
+        break;
+      case 'string':
+        out[c.name] = c.name === 'className' ? '' : 'value';
+        break;
+      case 'number':
+        out[c.name] = 0;
+        break;
+      case 'node':
+        out[c.name] = c.name === 'children' ? defaultChildrenGuess() : undefined;
+        break;
+    }
+  }
+  return out;
+}
+
+function defaultChildrenGuess() {
+  // Preview text is plain text — the iframe runtime wraps it.
+  return 'Button';
+}
+
+function buildPresets(
+  componentName: string,
+  variants: Record<string, string[]> | null,
+  controls: PropControl[],
+) {
+  const presets: { label: string; props: Record<string, unknown> }[] = [];
+  // Always produce a "Label only" preset matching the initial render.
+  presets.push({
+    label: 'Label only',
+    props: { children: componentName },
+  });
+  presets.push({
+    label: 'Label & icon',
+    props: { children: componentName, __withIcon: true },
+  });
+  presets.push({ label: 'Icon only', props: { children: '', __withIcon: true } });
+  if (controls.find((c) => c.name === 'disabled')) {
+    presets.push({ label: 'Disabled', props: { children: componentName, disabled: true } });
+  }
+  if (controls.find((c) => c.name === 'loading')) {
+    presets.push({ label: 'Loading', props: { children: componentName, loading: true } });
+  }
+  void variants;
+  return presets;
+}
+
+export function slugify(name: string): string {
+  return name
+    .replace(/([a-z])([A-Z])/g, '$1-$2')
+    .replace(/[^\w-]+/g, '-')
+    .replace(/--+/g, '-')
+    .replace(/^-|-$/g, '')
+    .toLowerCase();
+}
+
+function isLikelyComponentName(name: string): boolean {
+  return /^[A-Z]/.test(name);
+}
