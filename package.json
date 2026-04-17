@@ -9,6 +9,8 @@
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "test:extract-tokens": "npx --yes tsx@4 scripts/test-extract-tokens-typography.ts",
+    "test:sanitize": "npx --yes tsx@4 scripts/test-sanitize.ts",
+    "test": "npm run test:sanitize && npm run test:extract-tokens",
     "supabase": "supabase",
     "supabase:link": "supabase link",
     "supabase:config:push": "supabase config push",
