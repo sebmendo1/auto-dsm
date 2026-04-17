@@ -107,30 +107,44 @@ export async function scanRepo(
     // so that relative imports like `./container` or `../utils` resolve even
     // when the imported file isn't itself a top-level component.
     const relatedFiles = new Map<string, string>();
+    // Don't slice siblingFiles — we only use them as an O(1) *path index*
+    // when resolving imports, and we cap real network fetches via MAX_EXTRA.
+    // Also exclude fixtures/ since they're throwaway test scaffolds that
+    // tend to dominate file counts in repos like shadcn-ui/ui.
     const siblingFiles = tree.filter(
       (t) =>
         t.type === 'blob' &&
         /\.(tsx?|jsx?)$/.test(t.path) &&
         !/\b(node_modules|\.next|dist|build|out|coverage)\b/.test(t.path) &&
+        !/\b(fixtures|__fixtures__)\b/.test(t.path) &&
         !/\.(test|spec|stories)\.(tsx?|jsx?)$/.test(t.path) &&
         (t.size ?? 0) < 60_000,
-    ).slice(0, 600);
+    );
+    // Build a fast lookup index once; avoids O(N) .find() per candidate.
+    const siblingIndex = new Map<string, { path: string }>();
+    for (const f of siblingFiles) siblingIndex.set(f.path, f);
 
     const components: ParsedComponent[] = [];
     const render_configs: Record<string, RenderConfig> = {};
 
     const candidates = tsxFiles.slice(0, 80); // safety cap
     // Pre-fetch siblings referenced by any candidate so their relatives resolve.
-    // Pass 1: fetch all candidates (sources needed for parsing).
+    // Pass 1: fetch all candidates (sources needed for parsing) in parallel.
     const sources = new Map<string, string>();
-    for (let i = 0; i < candidates.length; i++) {
-      const entry = candidates[i];
-      try {
-        const src = await gh.getFile({ owner, name, branch: defaultBranch }, entry.path);
+    const CAND_CONCURRENCY = 12;
+    for (let i = 0; i < candidates.length; i += CAND_CONCURRENCY) {
+      const window = candidates.slice(i, i + CAND_CONCURRENCY);
+      const results = await Promise.all(
+        window.map((entry) =>
+          gh.getFile({ owner, name, branch: defaultBranch }, entry.path)
+            .then((src) => ({ entry, src }))
+            .catch(() => ({ entry, src: null as string | null })),
+        ),
+      );
+      for (const { entry, src } of results) {
+        if (src == null) continue;
         sources.set(entry.path, src);
         relatedFiles.set('/' + entry.path, src);
-      } catch {
-        /* ignore */
       }
     }
 
@@ -147,7 +161,7 @@ export async function scanRepo(
         for (const ext of ['', '.ts', '.tsx', '.js', '.jsx', '/index.ts', '/index.tsx']) {
           const candidate = joined + ext;
           if (relatedFiles.has('/' + candidate)) break;
-          const hit = siblingFiles.find((f) => f.path === candidate);
+          const hit = siblingIndex.get(candidate);
           if (hit) { bag.add(hit.path); break; }
         }
       }
@@ -159,12 +173,14 @@ export async function scanRepo(
         const resolved = resolveAliasPath(spec, aliases);
         if (!resolved) continue;
         for (const joined of resolved) {
+          let matched = false;
           for (const ext of ['', '.ts', '.tsx', '.js', '.jsx', '/index.ts', '/index.tsx']) {
             const candidate = joined + ext;
-            if (relatedFiles.has('/' + candidate)) break;
-            const hit = siblingFiles.find((f) => f.path === candidate);
-            if (hit) { bag.add(hit.path); break; }
+            if (relatedFiles.has('/' + candidate)) { matched = true; break; }
+            const hit = siblingIndex.get(candidate);
+            if (hit) { bag.add(hit.path); matched = true; break; }
           }
+          if (matched) break;
         }
       }
     }
@@ -175,20 +191,32 @@ export async function scanRepo(
       await enqueueReferenced(src, dir, neededSiblings);
     }
     let extraFetched = 0;
-    const MAX_EXTRA = 400;
-    for (let depth = 0; depth < 3 && neededSiblings.size > 0 && extraFetched < MAX_EXTRA; depth++) {
-      const batch = Array.from(neededSiblings);
+    const MAX_EXTRA = 600;
+    const CONCURRENCY = 12;
+    for (let depth = 0; depth < 4 && neededSiblings.size > 0 && extraFetched < MAX_EXTRA; depth++) {
+      const batch = Array.from(neededSiblings).filter((p) => !relatedFiles.has('/' + p));
       neededSiblings.clear();
-      for (const p of batch) {
-        if (extraFetched >= MAX_EXTRA) break;
-        if (relatedFiles.has('/' + p)) continue;
-        try {
-          const src = await gh.getFile({ owner, name, branch: defaultBranch }, p);
+      // Cap the batch so we never exceed MAX_EXTRA total fetches.
+      const take = batch.slice(0, MAX_EXTRA - extraFetched);
+      // Fetch in parallel windows to keep latency reasonable.
+      for (let i = 0; i < take.length; i += CONCURRENCY) {
+        const window = take.slice(i, i + CONCURRENCY);
+        const results = await Promise.all(
+          window.map((p) =>
+            gh.getFile({ owner, name, branch: defaultBranch }, p)
+              .then((src) => ({ p, src }))
+              .catch(() => ({ p, src: null as string | null })),
+          ),
+        );
+        for (const { p, src } of results) {
+          if (src == null) continue;
           relatedFiles.set('/' + p, src);
           extraFetched++;
           const dir = p.split('/').slice(0, -1).join('/');
+          // Synchronous body — our regex-based enqueue does no I/O.
+          // eslint-disable-next-line no-await-in-loop
           await enqueueReferenced(src, dir, neededSiblings);
-        } catch { /* ignore */ }
+        }
       }
     }
 
@@ -345,20 +373,27 @@ async function loadAliases(
     try { json = JSON.parse(stripped); } catch { continue; }
     const paths = json?.compilerOptions?.paths;
     if (!paths) continue;
-    const baseUrl = (json?.compilerOptions?.baseUrl ?? '.').replace(/^\.\//, '').replace(/^\.$/, '');
+    const baseUrlRaw = (json?.compilerOptions?.baseUrl ?? '.');
     const tsconfigDir = p.path.split('/').slice(0, -1).join('/');
-    // Absolute prefix (inside the repo) that baseUrl resolves to.
-    const rootPrefix = [tsconfigDir, baseUrl].filter(Boolean).join('/').replace(/\/$/, '');
+    // Normalise the baseUrl into a path relative to the repo root.
+    // `.` or `./` → tsconfigDir, `./foo` → tsconfigDir/foo, `foo` → tsconfigDir/foo.
+    const baseClean = baseUrlRaw.replace(/^\.\//, '').replace(/^\.$/, '').replace(/^\//, '').replace(/\/$/, '');
+    const rootPrefix = [tsconfigDir, baseClean].filter(Boolean).join('/');
     for (const [key, targets] of Object.entries(paths)) {
       // Accept `@/*` and `@/foo/*` style keys; normalise to `@/` etc.
       const cleanKey = key.replace(/\*$/, '');
       for (const t of targets) {
-        const cleanTarget = t.replace(/\*$/, '');
-        const prefix = [rootPrefix, cleanTarget].filter(Boolean).join('/').replace(/^\//, '').replace(/\/$/, '');
-        const normalized = prefix ? prefix + '/' : '';
+        // tsconfig targets are relative to baseUrl. Strip leading `./`,
+        // trailing `*`, normalise trailing slashes.
+        const cleanTarget = t
+          .replace(/^\.\//, '')
+          .replace(/^\.$/, '')
+          .replace(/\*$/, '')
+          .replace(/\/$/, '');
+        const finalPrefix = [rootPrefix, cleanTarget].filter(Boolean).join('/').replace(/^\//, '').replace(/\/$/, '');
         if (!aliases[cleanKey]) aliases[cleanKey] = [];
-        if (!aliases[cleanKey].includes(normalized.replace(/\/$/, ''))) {
-          aliases[cleanKey].push(normalized.replace(/\/$/, ''));
+        if (!aliases[cleanKey].includes(finalPrefix)) {
+          aliases[cleanKey].push(finalPrefix);
         }
       }
     }
