@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { AlertTriangle, RotateCcw, Sparkles } from 'lucide-react';
 import type { RenderConfig } from '@/lib/render/types';
 import type { RepairPatch, RepairResult } from '@/lib/ai/repair';
@@ -15,15 +15,52 @@ interface Props {
   onRepair?: (patchedConfig: RenderConfig, patch: RepairPatch) => void;
 }
 
+// Per-session rate-limit: the master spec caps repair at 1 attempt per
+// component per scan. We track successful *attempts* (success or failure) in
+// sessionStorage keyed by component slug so a reload is enough to unblock.
+const REPAIR_SENTINEL_KEY = 'autodsm.repairedSlugs';
+
+function readRepairedSlugs(): string[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = sessionStorage.getItem(REPAIR_SENTINEL_KEY);
+    return raw ? (JSON.parse(raw) as string[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function markSlugRepaired(slug: string) {
+  if (typeof window === 'undefined') return;
+  const next = Array.from(new Set([...readRepairedSlugs(), slug]));
+  try {
+    sessionStorage.setItem(REPAIR_SENTINEL_KEY, JSON.stringify(next));
+  } catch {
+    /* storage full or disabled — best-effort */
+  }
+}
+
 export function FallbackPanel({ error, config, componentName, onRetry, onRepair }: Props) {
   const [open, setOpen] = useState(false);
   const [repairing, setRepairing] = useState(false);
   const [repairError, setRepairError] = useState<string | null>(null);
+  const [exhausted, setExhausted] = useState(false);
 
-  const canRepair = Boolean(config && onRepair && componentName);
+  // Seed the exhaustion flag from sessionStorage once per mount.
+  useEffect(() => {
+    if (componentName && readRepairedSlugs().includes(componentName)) {
+      setExhausted(true);
+    }
+  }, [componentName]);
+
+  const canRepair = Boolean(config && onRepair && componentName) && !exhausted;
 
   async function runRepair() {
-    if (!config || !onRepair || !componentName) return;
+    if (!config || !onRepair || !componentName || exhausted) return;
+    // Mark the attempt before the network call so concurrent clicks or
+    // duplicate mounts can't fire twice.
+    markSlugRepaired(componentName);
+    setExhausted(true);
     setRepairing(true);
     setRepairError(null);
     try {
@@ -46,7 +83,7 @@ export function FallbackPanel({ error, config, componentName, onRetry, onRepair 
       });
       const data = (await res.json()) as RepairResult;
       if (!data.ok || !data.patch) {
-        setRepairError(data.error ?? 'Repair failed. Try again.');
+        setRepairError(data.error ?? 'Repair failed. Try again after reload.');
         return;
       }
       onRepair({ ...config, files: { ...config.files, ...data.patch.files } }, data.patch);
@@ -105,8 +142,14 @@ export function FallbackPanel({ error, config, componentName, onRetry, onRepair 
         )}
       </div>
 
+      {exhausted && !repairing && (
+        <p className="mt-3 text-[12px] text-t-tertiary">
+          AI repair already ran for this component this session. Reload to try again.
+        </p>
+      )}
+
       {repairError && (
-        <p className="mt-3 text-[12px]" style={{ color: 'var(--danger)' }}>
+        <p className="mt-3 text-[12px]" style={{ color: 'var(--error)' }}>
           {repairError}
         </p>
       )}
