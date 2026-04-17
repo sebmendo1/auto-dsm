@@ -42,8 +42,8 @@ export default function LandingPage() {
 
   return (
     <main
-      className="min-h-screen flex flex-col"
-      style={{ background: '#F4F4F6', color: '#111113' }}
+      className="theme-force-light min-h-screen flex flex-col"
+      style={{ background: 'var(--landing-bg)', color: 'var(--text-primary)' }}
     >
       {/* Top bar */}
       <header className="h-[72px] flex items-center justify-between px-4 md:px-8">
@@ -59,17 +59,23 @@ export default function LandingPage() {
         </a>
         <nav className="hidden md:block mx-auto">
           <div
-            className="flex items-center gap-8 rounded-full bg-white px-6 py-2"
-            style={{ boxShadow: '0 1px 2px rgba(17,17,19,0.06), 0 1px 1px rgba(17,17,19,0.04)' }}
+            className="flex items-center gap-8 rounded-full px-6 py-2"
+            style={{
+              background: 'var(--bg-elevated)',
+              boxShadow: 'var(--shadow-sm)',
+            }}
           >
-            <a href="/login" className="text-[14px] font-medium text-[#111113] hover:text-black transition-colors">Product</a>
-            <a href="/login" className="text-[14px] font-medium text-[#111113] hover:text-black transition-colors">Pricing</a>
-            <a href="https://github.com/sebmendo1/auto-dsm" target="_blank" rel="noreferrer" className="text-[14px] font-medium text-[#111113] hover:text-black transition-colors">GitHub</a>
+            <a href="#product" className="type-body font-medium transition-colors hover:opacity-80" style={{ color: 'var(--text-primary)' }}>Product</a>
+            <a href="#workflows" className="type-body font-medium transition-colors hover:opacity-80" style={{ color: 'var(--text-primary)' }}>Workflows</a>
+            <a href="#benefits" className="type-body font-medium transition-colors hover:opacity-80" style={{ color: 'var(--text-primary)' }}>Benefits</a>
           </div>
         </nav>
         <a
           href="/login"
-          className="rounded-full bg-[#8F23FA] px-4 py-2 md:px-6 md:py-2.5 text-[13px] md:text-[14px] font-semibold text-white hover:bg-[#7A1DD6] transition-colors"
+          className="rounded-full px-4 py-2 md:px-6 md:py-2.5 text-[13px] md:text-[14px] font-semibold transition-colors"
+          style={{ background: 'var(--accent)', color: 'var(--accent-fg)' }}
+          onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--accent-hover)'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--accent)'; }}
         >
           Log in
         </a>
@@ -82,13 +88,13 @@ export default function LandingPage() {
         >
           <h1
             className="font-display font-bold text-[32px] md:text-[44px] leading-[1.1]"
-            style={{ letterSpacing: '-0.02em', color: '#111113', maxWidth: 820 }}
+            style={{ letterSpacing: '-0.02em', color: 'var(--text-primary)', maxWidth: 820 }}
           >
             Visualize and maintain your design system with your GitHub repo
           </h1>
           <p
             className="mt-4 text-[17px] leading-[1.5]"
-            style={{ color: '#6B6B70' }}
+            style={{ color: 'var(--text-secondary)' }}
           >
             The design system manager built for the AI era.
           </p>
@@ -96,10 +102,10 @@ export default function LandingPage() {
           <div className="mt-8 w-full max-w-[520px]">
             <div
               className={
-                'relative flex h-14 items-center rounded-full bg-white ' +
+                'relative flex h-14 items-center rounded-full ' +
                 (shake ? 'animate-shake' : '')
               }
-              style={{ boxShadow: '0 4px 12px rgba(17,17,19,0.06), 0 1px 1px rgba(17,17,19,0.04)' }}
+              style={{ background: 'var(--bg-elevated)', boxShadow: 'var(--shadow-md)' }}
             >
               <input
                 ref={inputRef}
@@ -108,18 +114,21 @@ export default function LandingPage() {
                 onKeyDown={(e) => { if (e.key === 'Enter') submit(); }}
                 placeholder="Your Github repo"
                 aria-label="Your GitHub repo URL"
-                className="flex-1 h-full bg-transparent pl-6 pr-2 text-[15px] placeholder:text-[#B8B8BD] outline-none rounded-full"
-                style={{ color: '#111113' }}
+                className="flex-1 h-full bg-transparent pl-6 pr-2 text-[15px] outline-none rounded-full placeholder:text-[color:var(--text-placeholder)]"
+                style={{ color: 'var(--text-primary)' }}
               />
               <button
                 onClick={submit}
-                className="mr-1.5 rounded-full bg-[#8F23FA] px-6 py-2.5 text-[14px] font-semibold text-white hover:bg-[#7A1DD6] transition-colors"
+                className="mr-1.5 rounded-full px-6 py-2.5 text-[14px] font-semibold transition-colors"
+                style={{ background: 'var(--accent)', color: 'var(--accent-fg)' }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--accent-hover)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--accent)'; }}
               >
                 Get started
               </button>
             </div>
             {err && (
-              <p className="mt-3 text-[13px]" style={{ color: '#D93036' }}>
+              <p className="mt-3 text-[13px]" style={{ color: 'var(--error)' }}>
                 {err}
               </p>
             )}
