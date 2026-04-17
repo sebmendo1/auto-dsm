@@ -143,7 +143,8 @@ export const IFRAME_RUNTIME_SOURCE = /* js */ `
    * a shared promise list; the caller awaits these before executing
    * the bundle.
    */
-  function virtualFsPlugin(files, entryPath, pendingLoads) {
+  function virtualFsPlugin(files, entryPath, pendingLoads, importNames) {
+    importNames = importNames || {};
     return {
       name: 'autodsm-virtual-fs',
       setup(build) {
@@ -161,7 +162,7 @@ export const IFRAME_RUNTIME_SOURCE = /* js */ `
             ];
             const hit = candidates.find((c) => files[c] != null);
             if (hit) return { path: hit, namespace: 'vfs' };
-            return { path: 'stub:' + p, namespace: 'stub' };
+            return { path: 'stub:' + p, namespace: 'stub', pluginData: { originalSpec: p } };
           }
           // Absolute vfs paths (alias-rewritten by the parser).
           if (p.charAt(0) === '/') {
@@ -171,7 +172,7 @@ export const IFRAME_RUNTIME_SOURCE = /* js */ `
             ];
             const ok = cands.find((c) => files[c] != null);
             if (ok) return { path: ok, namespace: 'vfs' };
-            return { path: 'stub:' + p, namespace: 'stub' };
+            return { path: 'stub:' + p, namespace: 'stub', pluginData: { originalSpec: p } };
           }
           // Bare imports → virtual shim referencing window.__autodsm_deps.
           return { path: p, namespace: 'bare' };
@@ -188,9 +189,6 @@ export const IFRAME_RUNTIME_SOURCE = /* js */ `
 
         build.onLoad({ filter: /.*/, namespace: 'bare' }, (args) => {
           const key = args.path;
-          // Queue async load of this dep if it's not already cached.
-          // The build step doesn't await; we await before executing
-          // the generated bundle.
           if (!DEPS[key]) {
             let url = ESM_BASE + '/' + key;
             if (key === 'react') url = ESM_BASE + '/react@19';
@@ -199,38 +197,46 @@ export const IFRAME_RUNTIME_SOURCE = /* js */ `
             else if (key.startsWith('react-dom/')) url = ESM_BASE + '/react-dom@19/' + key.slice(10);
             pendingLoads.push(loadDep(key, url).catch(() => { DEPS[key] = {}; }));
           }
-          // The shim exposes the cached module's fields as named + default
-          // exports. Because bundling happens AFTER pendingLoads resolve,
-          // we can safely reference __autodsm_deps at runtime.
           const safe = JSON.stringify(key);
-          return {
-            contents: [
-              'const __mod = (window.__autodsm_deps && window.__autodsm_deps[' + safe + ']) || {};',
-              'const __get = (k) => __mod[k];',
-              'const __default = __mod.default !== undefined ? __mod.default : __mod;',
-              'export default __default;',
-              // Re-export everything the module provides.
-              'export const __autodsmModule = __mod;',
-              // Common named exports used across shadcn/ui, radix, etc.
-              'const __names = Object.keys(__mod);',
-              'export { __names };',
-            ].join('\\n'),
-            loader: 'js',
-          };
+          const lines = [
+            'const __mod = (window.__autodsm_deps && window.__autodsm_deps[' + safe + ']) || {};',
+            'const __default = __mod.default !== undefined ? __mod.default : __mod;',
+            'export default __default;',
+          ];
+          // Emit explicit named exports for every identifier used at
+          // import sites in the vfs. These resolve at runtime via __mod;
+          // if __mod doesn't have them yet (pass 1), they will be
+          // undefined — pass 2 re-runs with DEPS populated.
+          const need = importNames[key] || [];
+          for (const n of need) {
+            if (n === 'default' || n === '*') continue;
+            if (!/^[A-Za-z_$][A-Za-z0-9_$]*$/.test(n)) continue;
+            lines.push('export const ' + n + ' = __mod[' + JSON.stringify(n) + '];');
+          }
+          return { contents: lines.join('\\n'), loader: 'js' };
         });
 
         // Stub module for unresolved relative imports.
-        build.onLoad({ filter: /.*/, namespace: 'stub' }, () => ({
-          contents: [
+        // Emits explicit named exports so esbuild's static analysis is
+        // satisfied; each exported name is the same tolerant Proxy.
+        build.onLoad({ filter: /.*/, namespace: 'stub' }, (args) => {
+          const orig = (args.pluginData && args.pluginData.originalSpec) || '';
+          const need = importNames[orig] || [];
+          const lines = [
             'const proxy = new Proxy(function(){ return null; }, {',
             "  get: (_, k) => k === '__esModule' ? true : proxy,",
             '  apply: () => null,',
             '});',
             'export default proxy;',
             "export const cn = (...a) => a.filter(Boolean).join(' ');",
-          ].join('\\n'),
-          loader: 'js',
-        }));
+          ];
+          for (const n of need) {
+            if (n === 'default' || n === '*' || n === 'cn') continue;
+            if (!/^[A-Za-z_$][A-Za-z0-9_$]*$/.test(n)) continue;
+            lines.push('export const ' + n + ' = proxy;');
+          }
+          return { contents: lines.join('\\n'), loader: 'js' };
+        });
       },
     };
   }
@@ -259,11 +265,59 @@ export const IFRAME_RUNTIME_SOURCE = /* js */ `
    * in shadcn/ui ecosystem. Missing names fall through to proxy.
    */
 
-  /** Two-pass bundle: bundle once to discover bare specifiers, then
-   *  regenerate shims with exhaustive named exports. */
+  /**
+   * Pre-scan every vfs file to collect the named imports esbuild will
+   * need per specifier. Stubs must emit explicit `export const X`
+   * statements for each of these names, otherwise esbuild fails with
+   * "No matching export" at bundle time.
+   */
+  function collectImportNames(files) {
+    const specMap = {};
+    const add = (s, n) => { if (!specMap[s]) specMap[s] = new Set(); specMap[s].add(n); };
+    // Regex captures: lead default, named block, namespace-as, default-only, spec.
+    const re = new RegExp(
+      'import\\s+' +
+      '(?:([A-Za-z_$][\\w$]*)\\s*,\\s*)?' +
+      '(?:\\{([^}]*)\\}|\\*\\s+as\\s+([A-Za-z_$][\\w$]*)|([A-Za-z_$][\\w$]*))?' +
+      '\\s*(?:from\\s*)?' +
+      '[\\'\"]([^\\'\"]+)[\\'\"]',
+      'g'
+    );
+    for (const src of Object.values(files)) {
+      if (!src) continue;
+      let m;
+      while ((m = re.exec(src)) !== null) {
+        const leadDefault = m[1];
+        const namedBlock = m[2];
+        const nsAs = m[3];
+        const onlyDefault = m[4];
+        const spec = m[5];
+        if (leadDefault) add(spec, 'default');
+        if (onlyDefault && !namedBlock) add(spec, 'default');
+        if (nsAs) add(spec, '*');
+        if (namedBlock) {
+          const parts = namedBlock.split(',');
+          for (let i = 0; i < parts.length; i++) {
+            const token = parts[i].trim();
+            if (!token) continue;
+            const asMatch = token.match(/^([A-Za-z_$][\w$]*)\s+as\s+[A-Za-z_$][\w$]*$/);
+            const name = asMatch ? asMatch[1] : token;
+            if (/^[A-Za-z_$][\w$]*$/.test(name)) add(spec, name);
+          }
+        }
+      }
+    }
+    const out = {};
+    for (const k of Object.keys(specMap)) out[k] = Array.from(specMap[k]);
+    return out;
+  }
+
+  /** Two-pass bundle: pass 1 discovers bare specifiers (populating DEPS),
+   *  pass 2 emits the final IIFE with all named exports wired up. */
   async function bundleModule(config) {
     await loadEsbuild();
     const entryPath = pickEntryPath(config);
+    const importNames = collectImportNames(config.files);
 
     // PASS 1: no pendingLoads yet; this primes DEPS via discovery.
     const pending1 = [];
@@ -275,7 +329,7 @@ export const IFRAME_RUNTIME_SOURCE = /* js */ `
       target: 'es2020',
       jsx: 'automatic',
       jsxImportSource: 'react',
-      plugins: [virtualFsPlugin(config.files, entryPath, pending1)],
+      plugins: [virtualFsPlugin(config.files, entryPath, pending1, importNames)],
       logLevel: 'silent',
     }).catch(() => { /* swallow; pass 2 will rebuild */ });
     await Promise.all(pending1);
@@ -284,7 +338,6 @@ export const IFRAME_RUNTIME_SOURCE = /* js */ `
     // enumerate all keys — this allows esbuild to hoist named imports
     // into explicit export statements on the shim, which it then
     // wires into the IIFE closure.
-    const pending2 = [];
     const result = await esbuild.build({
       entryPoints: [entryPath],
       bundle: true,
@@ -294,19 +347,21 @@ export const IFRAME_RUNTIME_SOURCE = /* js */ `
       target: 'es2020',
       jsx: 'automatic',
       jsxImportSource: 'react',
-      plugins: [virtualFsPluginWithNames(config.files, entryPath)],
+      plugins: [virtualFsPluginWithNames(config.files, entryPath, importNames)],
       logLevel: 'silent',
     });
-    await Promise.all(pending2);
 
     const js = result.outputFiles && result.outputFiles[0] && result.outputFiles[0].text;
     if (!js) throw new Error('esbuild produced no output.');
     return { js, entryPath };
   }
 
-  /** Variant of the plugin whose 'bare' namespace emits explicit named
-   *  exports based on the keys present in window.__autodsm_deps[key]. */
-  function virtualFsPluginWithNames(files, entryPath) {
+  /** Variant of the plugin whose 'bare' and 'stub' namespaces emit
+   *  explicit named exports based on the union of keys present in
+   *  window.__autodsm_deps[key] AND the names actually imported by
+   *  the user code (importNames). This satisfies esbuild static analysis. */
+  function virtualFsPluginWithNames(files, entryPath, importNames) {
+    importNames = importNames || {};
     return {
       name: 'autodsm-virtual-fs-v2',
       setup(build) {
@@ -322,7 +377,7 @@ export const IFRAME_RUNTIME_SOURCE = /* js */ `
             ];
             const hit = candidates.find((c) => files[c] != null);
             if (hit) return { path: hit, namespace: 'vfs' };
-            return { path: 'stub:' + p, namespace: 'stub' };
+            return { path: 'stub:' + p, namespace: 'stub', pluginData: { originalSpec: p } };
           }
           if (p.charAt(0) === '/') {
             const cands = [
@@ -331,7 +386,7 @@ export const IFRAME_RUNTIME_SOURCE = /* js */ `
             ];
             const ok = cands.find((c) => files[c] != null);
             if (ok) return { path: ok, namespace: 'vfs' };
-            return { path: 'stub:' + p, namespace: 'stub' };
+            return { path: 'stub:' + p, namespace: 'stub', pluginData: { originalSpec: p } };
           }
           return { path: p, namespace: 'bare' };
         });
@@ -345,33 +400,46 @@ export const IFRAME_RUNTIME_SOURCE = /* js */ `
         build.onLoad({ filter: /.*/, namespace: 'bare' }, (args) => {
           const key = args.path;
           const mod = (DEPS[key]) || {};
-          const names = Object.keys(mod).filter((k) =>
-            k !== 'default' &&
-            /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(k)
-          );
+          const nameSet = {};
+          for (const k of Object.keys(mod)) {
+            if (k !== 'default' && /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(k)) nameSet[k] = true;
+          }
+          const need = importNames[key] || [];
+          for (const n of need) {
+            if (n === 'default' || n === '*') continue;
+            if (/^[A-Za-z_$][A-Za-z0-9_$]*$/.test(n)) nameSet[n] = true;
+          }
           const safe = JSON.stringify(key);
           const lines = [
             'const __mod = (window.__autodsm_deps && window.__autodsm_deps[' + safe + ']) || {};',
             'const __default = __mod.default !== undefined ? __mod.default : __mod;',
             'export default __default;',
           ];
-          for (const n of names) {
+          for (const n of Object.keys(nameSet)) {
             lines.push('export const ' + n + ' = __mod[' + JSON.stringify(n) + '];');
           }
           return { contents: lines.join('\\n'), loader: 'js' };
         });
 
-        build.onLoad({ filter: /.*/, namespace: 'stub' }, () => ({
-          contents: [
+        // Stub with explicit named exports matching what user code imports.
+        build.onLoad({ filter: /.*/, namespace: 'stub' }, (args) => {
+          const orig = (args.pluginData && args.pluginData.originalSpec) || '';
+          const need = importNames[orig] || [];
+          const lines = [
             'const proxy = new Proxy(function(){ return null; }, {',
             "  get: (_, k) => k === '__esModule' ? true : proxy,",
             '  apply: () => null,',
             '});',
             'export default proxy;',
             "export const cn = (...a) => a.filter(Boolean).join(' ');",
-          ].join('\\n'),
-          loader: 'js',
-        }));
+          ];
+          for (const n of need) {
+            if (n === 'default' || n === '*' || n === 'cn') continue;
+            if (!/^[A-Za-z_$][A-Za-z0-9_$]*$/.test(n)) continue;
+            lines.push('export const ' + n + ' = proxy;');
+          }
+          return { contents: lines.join('\\n'), loader: 'js' };
+        });
       },
     };
   }
