@@ -18,6 +18,7 @@
  */
 
 import type { RenderConfig } from '@/lib/render/types';
+import { sanitizeFilesForAI, sanitizeForAI } from './sanitize';
 
 export interface RepairRequest {
   /** The component the user was trying to render. */
@@ -68,7 +69,9 @@ JSON schema:
 }`;
 
 export function buildPrompt(req: RepairRequest): string {
-  const filesBlock = Object.entries(req.files)
+  // Strip secrets and env reads before the source leaves the server.
+  const safeFiles = sanitizeFilesForAI(req.files);
+  const filesBlock = Object.entries(safeFiles)
     .map(([path, src]) => `--- FILE ${path} ---\n${src}`)
     .join('\n\n');
   const depsBlock = Object.keys(req.dependencies).sort().join(', ') || '(none)';
@@ -76,8 +79,8 @@ export function buildPrompt(req: RepairRequest): string {
     `Component: ${req.component_name}`,
     `Dependencies available via esm.sh: ${depsBlock}`,
     req.error_file ? `Error file: ${req.error_file}` : null,
-    `Error message: ${req.error_message}`,
-    req.error_stack ? `Error stack:\n${req.error_stack}` : null,
+    `Error message: ${sanitizeForAI(req.error_message)}`,
+    req.error_stack ? `Error stack:\n${sanitizeForAI(req.error_stack)}` : null,
     `\nFiles:\n${filesBlock}`,
   ]
     .filter(Boolean)
@@ -92,7 +95,10 @@ export async function proposeRepair(
   req: RepairRequest,
   opts: { apiKey?: string; model?: string } = {},
 ): Promise<RepairResult> {
-  const apiKey = opts.apiKey ?? process.env.GEMINI_API_KEY;
+  // Prefer the server env key so secrets don't need to ride inside request
+  // bodies. Client-posted keys are only used when the server has nothing
+  // configured (local dev / self-hosted without env).
+  const apiKey = process.env.GEMINI_API_KEY || opts.apiKey;
   const model = opts.model ?? 'gemini-2.5-flash-lite';
   if (!apiKey) {
     return { ok: false, error: 'No Gemini API key configured. Add one in Settings.' };
