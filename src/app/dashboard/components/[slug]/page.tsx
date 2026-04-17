@@ -36,11 +36,11 @@ export default function ComponentDetailPage() {
   }
 
   return (
-    <div className="flex-1 flex min-h-0">
+    <div className="flex-1 flex flex-col lg:flex-row min-h-0">
       {/* LEFT column — top bar + tabs + render canvas */}
       <div className="flex-1 flex flex-col min-w-0">
-        <div className="h-[56px] px-6 flex items-center border-b border-t-default">
-          <span className="text-[14px] font-medium text-t-primary">{fileName}</span>
+        <div className="h-[48px] lg:h-[56px] px-4 lg:px-6 flex items-center border-b border-t-default">
+          <span className="text-[14px] font-medium text-t-primary truncate">{fileName}</span>
         </div>
         <Tabs defaultValue="demo" className="flex-1 flex flex-col min-h-0">
           <TabsList>

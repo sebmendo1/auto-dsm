@@ -13,13 +13,13 @@ export const metadata: Metadata = {
   },
 };
 
-// Set the theme *before* paint to avoid a white flash on dark mode.
+// Set the theme *before* paint to avoid a flash. Light is the default.
 const themeScript = `
 try {
   var t = localStorage.getItem('theme');
-  if (t === 'light') document.documentElement.classList.remove('dark');
-  else document.documentElement.classList.add('dark');
-} catch (e) { document.documentElement.classList.add('dark'); }
+  if (t === 'dark') document.documentElement.classList.add('dark');
+  else document.documentElement.classList.remove('dark');
+} catch (e) { document.documentElement.classList.remove('dark'); }
 `;
 
 export default function RootLayout({
@@ -39,13 +39,13 @@ export default function RootLayout({
       <body className="font-sans antialiased">
         <ThemeProvider
           attribute="class"
-          defaultTheme="dark"
-          enableSystem
+          defaultTheme="light"
+          enableSystem={false}
           disableTransitionOnChange
         >
           {children}
           <Toaster
-            theme="dark"
+            theme="light"
             position="bottom-right"
             toastOptions={{
               style: {

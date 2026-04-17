@@ -43,7 +43,7 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="max-w-[720px] mx-auto px-8 py-10 flex flex-col gap-10">
+    <div className="max-w-[720px] mx-auto px-4 md:px-8 py-6 md:py-10 flex flex-col gap-8 md:gap-10 w-full">
       <header className="flex flex-col gap-1">
         <h1 className="text-[24px] font-semibold tracking-tight font-heading">Settings</h1>
         <p className="text-[14px] text-t-secondary">
@@ -51,7 +51,7 @@ export default function SettingsPage() {
         </p>
       </header>
 
-      <Section title="Appearance" description="Default to dark. Works everywhere.">
+      <Section title="Appearance" description="Light by default. Works everywhere.">
         <div className="grid grid-cols-2 gap-2">
           <ThemeCard
             icon={<Moon size={16} strokeWidth={1.5} />}

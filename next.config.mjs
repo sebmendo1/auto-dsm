@@ -15,9 +15,14 @@ const nextConfig = {
       {
         source: '/render/(.*)',
         headers: [
-          // Allow the render iframe to be embedded from the same origin.
           { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
-          { key: 'Content-Security-Policy', value: "default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob: https://esm.sh https://cdn.jsdelivr.net" },
+          { key: 'Content-Security-Policy', value: "default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob: https://esm.sh https://cdn.jsdelivr.net https://cdn.tailwindcss.com" },
+        ],
+      },
+      {
+        source: '/api/render/(.*)',
+        headers: [
+          { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
         ],
       },
     ];

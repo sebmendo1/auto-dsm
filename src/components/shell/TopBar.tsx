@@ -34,11 +34,11 @@ export function TopBar({ label, align = 'center' }: Props) {
   return (
     <div
       className={
-        'h-[56px] flex items-center border-b border-t-default px-6 ' +
+        'h-[48px] md:h-[56px] flex items-center border-b border-t-default px-4 md:px-6 ' +
         (align === 'center' ? 'justify-center' : '')
       }
     >
-      <span className="text-[14px] font-medium text-t-secondary">{auto}</span>
+      <span className="text-[13px] md:text-[14px] font-medium text-t-secondary truncate">{auto}</span>
     </div>
   );
 }

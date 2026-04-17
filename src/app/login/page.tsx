@@ -21,11 +21,11 @@ export default function LoginPage() {
   return (
     <main className="min-h-screen flex items-center justify-center surface-primary px-4">
       <div
-        className="w-full max-w-[420px] rounded-2xl border border-t-default p-10"
+        className="w-full max-w-[420px] rounded-2xl border border-t-default p-6 md:p-10"
         style={{ background: 'var(--bg-elevated)' }}
       >
         <div className="flex justify-center">
-          <Image src="/brand/autodsm-icon-dark.svg" alt="autoDSM" width={32} height={32} />
+          <Image src="/brand/autodsm-icon-light.svg" alt="autoDSM" width={32} height={32} />
         </div>
         <h1 className="mt-6 text-center font-display font-semibold text-[24px] text-t-primary">
           Sign in to autoDSM
@@ -37,7 +37,7 @@ export default function LoginPage() {
         <div className="mt-8 flex flex-col gap-3">
           <button
             onClick={proceed}
-            className="h-11 w-full rounded-lg bg-white text-[#111113] dark:bg-white dark:text-[#111113] flex items-center justify-center gap-2 font-medium text-[14px] hover:opacity-90 transition-base"
+            className="h-11 w-full rounded-lg border border-t-default bg-[var(--bg-primary)] text-t-primary flex items-center justify-center gap-2 font-medium text-[14px] hover:bg-[var(--bg-tertiary)] transition-base"
           >
             <Github size={18} strokeWidth={1.5} />
             Continue with GitHub
@@ -53,8 +53,8 @@ export default function LoginPage() {
 
         <p className="mt-6 text-center text-[12px] text-t-tertiary">
           By continuing you agree to the{' '}
-          <a href="#" className="underline underline-offset-2">Terms</a> and{' '}
-          <a href="#" className="underline underline-offset-2">Privacy Policy</a>.
+          <a href="/legal/terms" className="underline underline-offset-2 hover:text-t-secondary">Terms</a> and{' '}
+          <a href="/legal/privacy" className="underline underline-offset-2 hover:text-t-secondary">Privacy Policy</a>.
         </p>
       </div>
     </main>

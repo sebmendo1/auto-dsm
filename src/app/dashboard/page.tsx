@@ -19,15 +19,15 @@ export default function DashboardPage() {
   return (
     <>
       <TopBar />
-      <div className="flex-1 overflow-y-auto p-10">
-        <h1 className="font-display font-bold text-[30px] leading-[38px] text-t-primary" style={{ letterSpacing: '-0.015em' }}>
+      <div className="flex-1 overflow-y-auto p-4 md:p-8 lg:p-10">
+        <h1 className="font-display font-bold text-[24px] md:text-[30px] leading-[32px] md:leading-[38px] text-t-primary" style={{ letterSpacing: '-0.015em' }}>
           Your GitHub project
         </h1>
-        <p className="mt-2 text-[15px] leading-[24px] text-t-secondary max-w-[640px]">
+        <p className="mt-2 text-[14px] md:text-[15px] leading-[22px] md:leading-[24px] text-t-secondary max-w-[640px]">
           Here are all your active components and performance metrics around them.
         </p>
 
-        <div className="mt-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="mt-6 md:mt-8 grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
           {metrics.map((m) => (
             <div
               key={m.label}

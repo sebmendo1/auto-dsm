@@ -41,7 +41,7 @@ export default function LandingPage() {
       style={{ background: '#F4F4F6', color: '#111113' }}
     >
       {/* Top bar */}
-      <header className="h-[72px] flex items-center px-8">
+      <header className="h-[72px] flex items-center justify-between px-4 md:px-8">
         <a href="/" className="flex items-center gap-2" aria-label="autoDSM home">
           <Image
             src="/brand/autodsm-wordmark-light.svg"
@@ -49,21 +49,22 @@ export default function LandingPage() {
             width={140}
             height={28}
             priority
+            className="h-6 w-auto md:h-7"
           />
         </a>
-        <nav className="mx-auto">
+        <nav className="hidden md:block mx-auto">
           <div
             className="flex items-center gap-8 rounded-full bg-white px-6 py-2"
             style={{ boxShadow: '0 1px 2px rgba(17,17,19,0.06), 0 1px 1px rgba(17,17,19,0.04)' }}
           >
-            <a href="#product" className="text-[14px] font-medium text-[#111113] hover:text-black transition-colors">Product</a>
-            <a href="#workflows" className="text-[14px] font-medium text-[#111113] hover:text-black transition-colors">Workflows</a>
-            <a href="#benefits" className="text-[14px] font-medium text-[#111113] hover:text-black transition-colors">Benefits</a>
+            <a href="/login" className="text-[14px] font-medium text-[#111113] hover:text-black transition-colors">Product</a>
+            <a href="/login" className="text-[14px] font-medium text-[#111113] hover:text-black transition-colors">Pricing</a>
+            <a href="https://github.com/sebmendo1/auto-dsm" target="_blank" rel="noreferrer" className="text-[14px] font-medium text-[#111113] hover:text-black transition-colors">GitHub</a>
           </div>
         </nav>
         <a
           href="/login"
-          className="rounded-full bg-[#8F23FA] px-6 py-2.5 text-[14px] font-semibold text-white hover:bg-[#7A1DD6] transition-colors"
+          className="rounded-full bg-[#8F23FA] px-4 py-2 md:px-6 md:py-2.5 text-[13px] md:text-[14px] font-semibold text-white hover:bg-[#7A1DD6] transition-colors"
         >
           Log in
         </a>
@@ -72,11 +73,10 @@ export default function LandingPage() {
       {/* Hero */}
       <section className="flex-1 flex items-start justify-center">
         <div
-          className="w-full max-w-[820px] flex flex-col items-center text-center px-6"
-          style={{ paddingTop: '14vh' }}
+          className="w-full max-w-[820px] flex flex-col items-center text-center px-6 pt-[8vh] md:pt-[14vh]"
         >
           <h1
-            className="font-display font-bold text-[44px] md:text-[44px] text-[32px] leading-[1.1]"
+            className="font-display font-bold text-[32px] md:text-[44px] leading-[1.1]"
             style={{ letterSpacing: '-0.02em', color: '#111113', maxWidth: 820 }}
           >
             Visualize and maintain your design system with your GitHub repo

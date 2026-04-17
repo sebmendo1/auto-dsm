@@ -102,12 +102,16 @@
 
   html {
     font-family: var(--font-sans);
-    color-scheme: dark;
+    color-scheme: light;
     background: var(--bg-primary);
     color: var(--text-primary);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
+  }
+
+  html.dark {
+    color-scheme: dark;
   }
 
   body {

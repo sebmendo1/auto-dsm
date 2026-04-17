@@ -25,7 +25,7 @@ function UnsupportedInner() {
     <main className="min-h-screen flex items-center justify-center surface-primary px-4">
       <div className="w-full max-w-[480px] rounded-2xl border border-t-default p-10" style={{ background: 'var(--bg-elevated)' }}>
         <div className="flex justify-center">
-          <Image src="/brand/autodsm-icon-dark.svg" alt="autoDSM" width={32} height={32} />
+          <Image src="/brand/autodsm-icon-light.svg" alt="autoDSM" width={32} height={32} />
         </div>
         <h1 className="mt-6 text-center font-display font-semibold text-[22px] text-t-primary">
           autoDSM currently supports React + TypeScript.

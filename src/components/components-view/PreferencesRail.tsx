@@ -24,13 +24,13 @@ export function PreferencesRail({ config, props, onChange, fileName, githubUrl }
 
   return (
     <aside
-      className="w-[320px] shrink-0 flex flex-col"
-      style={{ background: 'var(--bg-primary)', borderLeft: '1px solid var(--border-default)' }}
+      className="w-full lg:w-[320px] lg:shrink-0 flex flex-col border-t border-t-default lg:border-t-0 lg:border-l"
+      style={{ background: 'var(--bg-primary)' }}
     >
-      <div className="h-[56px] px-6 py-4 border-b border-t-default flex items-center">
-        <span className="font-display font-semibold text-[16px] text-t-primary">Preferences</span>
+      <div className="h-[48px] lg:h-[56px] px-4 lg:px-6 py-3 lg:py-4 border-b border-t-default flex items-center">
+        <span className="font-display font-semibold text-[15px] lg:text-[16px] text-t-primary">Preferences</span>
       </div>
-      <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-5">
+      <div className="flex-1 overflow-y-auto p-4 lg:p-6 flex flex-col gap-5">
         {config.presets && config.presets.length > 0 && (
           <div className="flex flex-col gap-1.5">
             <label className="text-[14px] font-medium text-t-primary">Configuration</label>

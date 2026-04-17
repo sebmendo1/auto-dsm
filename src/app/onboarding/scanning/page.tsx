@@ -63,7 +63,7 @@ function ScanningInner() {
     <main className="min-h-screen flex items-center justify-center surface-primary px-4">
       <div className="w-full max-w-[520px] flex flex-col items-center text-center">
         <Image
-          src="/brand/autodsm-icon-dark.svg"
+          src="/brand/autodsm-icon-light.svg"
           alt="autoDSM"
           width={40}
           height={40}
