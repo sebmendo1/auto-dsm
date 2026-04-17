@@ -2,10 +2,12 @@
 const nextConfig = {
   reactStrictMode: true,
   typedRoutes: false,
-  // V1 preview: type/lint errors don't block the build. Runtime correctness is
-  // covered by integration testing; the parser has a lot of deliberate `any`.
+  // TODO(autodsm): the parser layer (src/lib/parsers/**) and iframe runtime
+  // (src/lib/render/iframe-runtime.ts) still use deliberate `any` that needs
+  // typing before we can flip ignoreBuildErrors to false. Tracked in the
+  // review plan under PR2 "build hygiene".
   typescript: { ignoreBuildErrors: true },
-  eslint: { ignoreDuringBuilds: true },
+  eslint: { ignoreDuringBuilds: false },
   // The iframe render runtime and esbuild-wasm require special headers for
   // SharedArrayBuffer-backed threads, but we intentionally run esbuild-wasm
   // single-threaded so we can avoid COOP/COEP isolation (which would break
