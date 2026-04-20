@@ -29,14 +29,13 @@ export default function RootLayout({
       <body>
         <ThemeProvider
           attribute="class"
-          defaultTheme="dark"
+          defaultTheme="light"
           enableSystem={false}
           disableTransitionOnChange
         >
           {children}
           <Toaster
             position="bottom-right"
-            theme="dark"
             toastOptions={{
               style: {
                 background: "var(--bg-elevated)",
