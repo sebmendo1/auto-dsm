@@ -7,7 +7,7 @@ Use this checklist so the **contribute build** on Vercel uses **`brand-book-v1`*
 | Check | Action |
 |--------|--------|
 | Repository | **GitHub**: `sebmendo1/auto-dsm` |
-| Contribute branch | **`brand-book-v1`** (contains auth routes: `/auth/signin`, `/auth/callback`, `/auth/bridge`) |
+| Contribute branch | **`brand-book-v1`** (contains auth routes: `/login`, `/auth/callback`, `/auth/bridge`) |
 | Vercel project | Open [Vercel Dashboard](https://vercel.com) → project **`autodsm`** → **Settings → Git** |
 
 **If “contribute build” = Production**
@@ -56,7 +56,7 @@ Project: [Supabase Dashboard](https://supabase.com/dashboard) → project **`muj
 
 **Authentication → URL Configuration**
 
-- **Site URL**: use your primary deployed URL (e.g. production: `https://<your-vercel-domain>`).
+- **Site URL**: use your primary **app** URL (e.g. `https://autodsm.vercel.app`). Do **not** set Site URL to `https://mujlucfkoqvghvdikkhw.supabase.co` — that can break OAuth and surface errors on paths like `/oauth/consent` on the Supabase host.
 - **Redirect URLs**: add every origin you use for OAuth return:
 
 ```
@@ -69,7 +69,7 @@ For rotating Vercel preview URLs, either:
 - Add each preview URL after deploy, or  
 - Use a **wildcard** redirect pattern if your Supabase plan/settings allow (e.g. `https://*.vercel.app/auth/callback` — confirm in Supabase docs for your project).
 
-OAuth uses `redirectTo` built from the **request origin** in [`src/app/auth/signin/route.ts`](../src/app/auth/signin/route.ts), so the callback path is always **`/auth/callback`** on whatever host Vercel serves.
+OAuth is started from the browser on [`/login`](../src/app/login/page.tsx) via `signInWithOAuth`, with `redirectTo` = `NEXT_PUBLIC_APP_URL` (if set) or `window.location.origin`, plus **`/auth/callback`**. That URL must appear in Supabase **Redirect URLs**.
 
 ### GitHub provider
 
@@ -89,7 +89,7 @@ Same section → **Google** — only if you use “Continue with Google” on `/
 On the Vercel deployment URL (e.g. deployment overview: [autodsm deployment](https://vercel.com)):
 
 1. Open **`/login`**.
-2. Click **Continue with GitHub** (navigates to `/auth/signin?provider=github`).
+2. Click **Continue with GitHub** (starts Supabase OAuth in the browser, then redirects to GitHub).
 3. Complete GitHub consent.
 4. Expect: **`/auth/callback`** → **`/auth/bridge`** → **`/dashboard`** or **`/onboarding`**.
 5. Refresh **`/dashboard`** — session should persist (cookies + middleware in [`src/middleware.ts`](../src/middleware.ts)).
@@ -98,13 +98,14 @@ On the Vercel deployment URL (e.g. deployment overview: [autodsm deployment](htt
 
 | Symptom | Likely fix |
 |---------|------------|
+| `{"error":"requested path is invalid"}` (often on `*.supabase.co`) | Usually **`GET /oauth/consent`** on the project host (not served on hosted projects). Fix **Site URL** to your Vercel app origin; ensure **Redirect URLs** include `https://<your-app>/auth/callback`. |
 | “Redirect URL not allowed” | Add exact `https://<host>/auth/callback` to Supabase Redirect URLs. |
 | Login button does nothing / instant error | Missing or wrong `NEXT_PUBLIC_SUPABASE_*` in Vercel; redeploy. |
 | Callback then always `/login` | `exchangeCodeForSession` failing — check Supabase logs; confirm Site URL / redirect allowlist. |
 
 ## 6. Related code paths
 
-- OAuth start: `src/app/auth/signin/route.ts`
+- OAuth start (browser): `src/app/login/page.tsx`
 - Code exchange: `src/app/auth/callback/route.ts`
 - Client bridge: `src/app/auth/bridge/page.tsx`
 - Supabase clients: `src/lib/supabase/{client,server,middleware}.ts`

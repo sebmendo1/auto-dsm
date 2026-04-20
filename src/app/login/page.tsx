@@ -3,6 +3,7 @@
 import * as React from "react";
 import Image from "next/image";
 import { useTheme } from "next-themes";
+import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 
@@ -12,11 +13,32 @@ export default function LoginPage() {
   const [errorFromQuery, setErrorFromQuery] = React.useState<string | null>(null);
 
   React.useEffect(() => {
-    // If /auth/callback or /auth/signin bounces us back with an error, surface it.
     const url = new URL(window.location.href);
     const err = url.searchParams.get("error");
     if (err) setErrorFromQuery(err);
   }, []);
+
+  async function signIn(provider: "github" | "google") {
+    setLoading(provider);
+    try {
+      const supabase = createClient();
+      const appOrigin =
+        process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") ||
+        window.location.origin;
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider,
+        options: {
+          redirectTo: `${appOrigin}/auth/callback`,
+          scopes: provider === "github" ? "read:user user:email" : undefined,
+        },
+      });
+      if (error) toast.error(error.message);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Sign-in failed");
+    } finally {
+      setLoading(null);
+    }
+  }
 
   const iconSrc =
     resolvedTheme === "light"
@@ -47,34 +69,26 @@ export default function LoginPage() {
 
         <div className="mt-8 flex flex-col gap-3">
           <Button
+            type="button"
             size="lg"
             className="w-full bg-[var(--text-primary)] text-[var(--bg-primary)] hover:opacity-90"
-            asChild
+            onClick={() => signIn("github")}
             disabled={loading !== null}
           >
-            <a
-              href="/auth/signin?provider=github"
-              onClick={() => setLoading("github")}
-            >
             <GithubGlyph />
             {loading === "github" ? "Redirecting…" : "Continue with GitHub"}
-            </a>
           </Button>
 
           <Button
+            type="button"
             variant="outline"
             size="lg"
             className="w-full"
-            asChild
+            onClick={() => signIn("google")}
             disabled={loading !== null}
           >
-            <a
-              href="/auth/signin?provider=google"
-              onClick={() => setLoading("google")}
-            >
             <GoogleGlyph />
             {loading === "google" ? "Redirecting…" : "Continue with Google"}
-            </a>
           </Button>
         </div>
 
