@@ -1,24 +1,25 @@
-'use client';
+import * as React from "react";
+import { cn } from "@/lib/utils";
 
-import * as React from 'react';
-import { cn } from '@/lib/utils';
-
-export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {}
+export type InputProps = React.InputHTMLAttributes<HTMLInputElement>;
 
 export const Input = React.forwardRef<HTMLInputElement, InputProps>(
-  ({ className, type, ...props }, ref) => (
-    <input
-      ref={ref}
-      type={type}
-      className={cn(
-        'flex h-10 w-full rounded-lg border border-[var(--border-default)] bg-[var(--bg-elevated)] px-3 py-2 text-[14px] text-[var(--text-primary)] placeholder:text-[var(--text-placeholder)] transition-base',
-        'focus-visible:outline-none focus-visible:border-[var(--accent)] focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-0',
-        'disabled:cursor-not-allowed disabled:opacity-50',
-        'font-sans',
-        className,
-      )}
-      {...props}
-    />
-  ),
+  ({ className, type = "text", ...props }, ref) => {
+    return (
+      <input
+        ref={ref}
+        type={type}
+        className={cn(
+          "h-9 w-full rounded-[8px] bg-[var(--bg-elevated)] border border-[var(--border-default)] px-3 text-[14px]",
+          "text-[var(--text-primary)] placeholder:text-[var(--text-placeholder)]",
+          "transition-colors duration-150 [transition-timing-function:var(--ease-standard)]",
+          "focus-visible:outline-none focus-visible:border-[var(--accent)]",
+          "disabled:opacity-50 disabled:pointer-events-none",
+          className,
+        )}
+        {...props}
+      />
+    );
+  },
 );
-Input.displayName = 'Input';
+Input.displayName = "Input";

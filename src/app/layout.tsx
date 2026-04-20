@@ -1,26 +1,23 @@
-import type { Metadata } from 'next';
-import { ThemeProvider } from 'next-themes';
-import { Toaster } from 'sonner';
-import { manrope, sora, geistMono } from '@/styles/fonts';
-import './globals.css';
+import type { Metadata } from "next";
+import { ThemeProvider } from "@/components/providers/theme-provider";
+import { Toaster } from "sonner";
+import { fontVariables } from "@/styles/fonts";
+import "./globals.css";
 
 export const metadata: Metadata = {
-  title: 'autoDSM — visualise and maintain your design system',
+  title: "autoDSM — The design system manager built for the AI era",
   description:
-    'autoDSM turns any GitHub repo into a live, interactive design system in under 30 seconds.',
+    "Connect a GitHub repository and get a premium, shareable brand book for every color, font, spacing value, shadow, border, animation, breakpoint, and asset.",
   icons: {
-    icon: '/brand/autodsm-icon-dark.svg',
+    icon: "/brand/autodsm-icon-dark.svg",
+  },
+  openGraph: {
+    title: "autoDSM",
+    description:
+      "The design system manager built for the AI era.",
+    type: "website",
   },
 };
-
-// Set the theme *before* paint to avoid a flash. Light is the default.
-const themeScript = `
-try {
-  var t = localStorage.getItem('theme');
-  if (t === 'dark') document.documentElement.classList.add('dark');
-  else document.documentElement.classList.remove('dark');
-} catch (e) { document.documentElement.classList.remove('dark'); }
-`;
 
 export default function RootLayout({
   children,
@@ -28,31 +25,23 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html
-      lang="en"
-      suppressHydrationWarning
-      className={`${manrope.variable} ${sora.variable} ${geistMono.variable}`}
-    >
-      <head>
-        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
-      </head>
-      <body className="font-sans antialiased">
+    <html lang="en" suppressHydrationWarning className={fontVariables}>
+      <body>
         <ThemeProvider
           attribute="class"
-          defaultTheme="light"
+          defaultTheme="dark"
           enableSystem={false}
           disableTransitionOnChange
         >
           {children}
           <Toaster
-            theme="light"
             position="bottom-right"
+            theme="dark"
             toastOptions={{
               style: {
-                background: 'var(--bg-elevated)',
-                color: 'var(--text-primary)',
-                border: '1px solid var(--border-default)',
-                fontFamily: 'var(--font-sans)',
+                background: "var(--bg-elevated)",
+                color: "var(--text-primary)",
+                border: "1px solid var(--border-default)",
               },
             }}
           />

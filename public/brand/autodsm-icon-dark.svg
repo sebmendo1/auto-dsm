@@ -1,11 +1,12 @@
-<?xml version='1.0' encoding='utf-8'?>
-<svg xmlns="http://www.w3.org/2000/svg" width="169" height="200" viewBox="0 0 169 200" fill="none">
-<path d="M67.0752 22.8193C77.7303 17.0821 90.5549 17.082 101.21 22.8193L137.353 42.2803C149.013 48.5591 156.285 60.7338 156.285 73.9775V126.022C156.285 139.266 149.013 151.441 137.353 157.72L101.21 177.181C90.5549 182.918 77.7303 182.918 67.0752 177.181L30.9326 157.72C19.2719 151.441 12 139.266 12 126.022V73.9775C12 60.7338 19.2719 48.5591 30.9326 42.2803L67.0752 22.8193Z" fill="url(#paint0_linear_291_6578)" stroke="#8F23FA" stroke-width="24"/>
-<path d="M12 55.5718L75.0766 87.3763C80.9968 90.3614 87.9882 90.3318 93.8828 87.2968L155.5 55.5718" stroke="#8F23FA" stroke-width="24"/>
-<defs>
-<linearGradient id="paint0_linear_291_6578" x1="-18" y1="27.5718" x2="168" y2="159.5" gradientUnits="userSpaceOnUse">
-<stop stop-color="white" stop-opacity="0"/>
-<stop offset="1" stop-color="#AA56FF" stop-opacity="0.16"/>
-</linearGradient>
-</defs>
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="autoDSM">
+  <defs>
+    <linearGradient id="autodsm-icon-g" x1="24" y1="4" x2="8" y2="28" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#AA56FF" stop-opacity="0.28"/>
+      <stop offset="0.6" stop-color="#8F23FA" stop-opacity="1"/>
+      <stop offset="1" stop-color="#7A1DD6"/>
+    </linearGradient>
+  </defs>
+  <path d="M16 2.5 L28 9 V23 L16 29.5 L4 23 V9 Z" fill="url(#autodsm-icon-g)" stroke="#8F23FA" stroke-width="1" stroke-linejoin="round"/>
+  <path d="M4.5 9 L16 15.75 L27.5 9" stroke="#F5F5F7" stroke-opacity="0.7" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M16 15.75 V29" stroke="#F5F5F7" stroke-opacity="0.3" stroke-width="1.2" stroke-linecap="round"/>
 </svg>

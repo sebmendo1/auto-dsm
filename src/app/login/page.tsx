@@ -1,74 +1,100 @@
-'use client';
+"use client";
 
-import Image from 'next/image';
-import { useRouter } from 'next/navigation';
-import { Github } from 'lucide-react';
+import * as React from "react";
+import Image from "next/image";
+import { useTheme } from "next-themes";
+import { createClient } from "@/lib/supabase/client";
+import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 
 export default function LoginPage() {
-  const router = useRouter();
+  const { resolvedTheme } = useTheme();
+  const [loading, setLoading] = React.useState<"github" | "google" | null>(null);
 
-  function proceed() {
-    // In V1 we bypass real auth and let the user straight through. Supabase
-    // wires in when the user provides env vars. See docs/DEPLOYMENT.md.
-    let target = '/onboarding';
-    try {
-      const pending = sessionStorage.getItem('autodsm.pendingRepo');
-      if (pending) target = `/onboarding/scanning?repo=${encodeURIComponent(pending)}`;
-    } catch {}
-    router.push(target);
+  async function signIn(provider: "github" | "google") {
+    setLoading(provider);
+    const supabase = createClient();
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider,
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`,
+        scopes: provider === "github" ? "read:user user:email" : undefined,
+      },
+    });
+    if (error) {
+      toast.error(error.message);
+      setLoading(null);
+    }
   }
 
+  const iconSrc =
+    resolvedTheme === "light"
+      ? "/brand/autodsm-icon-light.svg"
+      : "/brand/autodsm-icon-dark.svg";
+
   return (
-    <main className="min-h-screen flex items-center justify-center surface-primary px-4">
-      <div
-        className="w-full max-w-[420px] rounded-2xl border border-t-default p-6 md:p-10"
-        style={{ background: 'var(--bg-elevated)' }}
-      >
-        <div className="flex justify-center">
-          <Image src="/brand/autodsm-icon-light.svg" alt="autoDSM" width={32} height={32} />
-        </div>
-        <h1 className="mt-6 text-center font-display font-semibold text-[24px] text-t-primary">
-          Sign in to autoDSM
-        </h1>
-        <p className="mt-2 text-center text-[14px] text-t-secondary">
+    <div className="min-h-screen grid place-items-center bg-[var(--bg-primary)] px-6">
+      <div className="w-full max-w-[420px] rounded-xl border border-[var(--border-default)] bg-[var(--bg-elevated)] p-10">
+        <Image
+          src={iconSrc}
+          alt=""
+          width={32}
+          height={32}
+          aria-hidden
+          priority
+        />
+        <h2 className="mt-6 text-h2 text-[var(--text-primary)]">Sign in to autoDSM</h2>
+        <p className="mt-2 text-body-s text-[var(--text-secondary)]">
           Connect your design system in under a minute.
         </p>
 
         <div className="mt-8 flex flex-col gap-3">
-          <button
-            onClick={proceed}
-            className="h-11 w-full rounded-lg border border-t-default bg-[var(--bg-primary)] text-t-primary flex items-center justify-center gap-2 font-medium text-[14px] hover:bg-[var(--bg-tertiary)] transition-base"
+          <Button
+            size="lg"
+            className="w-full bg-[var(--text-primary)] text-[var(--bg-primary)] hover:opacity-90"
+            onClick={() => signIn("github")}
+            disabled={loading !== null}
           >
-            <Github size={18} strokeWidth={1.5} />
-            Continue with GitHub
-          </button>
-          <button
-            onClick={proceed}
-            className="h-11 w-full rounded-lg border border-t-default bg-transparent text-t-primary flex items-center justify-center gap-2 font-medium text-[14px] hover:bg-[var(--bg-tertiary)] transition-base"
+            <GithubGlyph />
+            {loading === "github" ? "Redirecting…" : "Continue with GitHub"}
+          </Button>
+
+          <Button
+            variant="outline"
+            size="lg"
+            className="w-full"
+            onClick={() => signIn("google")}
+            disabled={loading !== null}
           >
             <GoogleGlyph />
-            Continue with Google
-          </button>
+            {loading === "google" ? "Redirecting…" : "Continue with Google"}
+          </Button>
         </div>
 
-        <p className="mt-6 text-center text-[12px] text-t-tertiary">
-          By continuing you agree to the{' '}
-          <a href="/legal/terms" className="underline underline-offset-2 hover:text-t-secondary">Terms</a> and{' '}
-          <a href="/legal/privacy" className="underline underline-offset-2 hover:text-t-secondary">Privacy Policy</a>.
+        <p className="mt-8 text-[12px] leading-[18px] text-[var(--text-tertiary)]">
+          By continuing you agree to our terms and privacy policy. We read only
+          your public profile + the repositories you connect.
         </p>
       </div>
-    </main>
+    </div>
+  );
+}
+
+function GithubGlyph() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+      <path d="M12 .5A11.5 11.5 0 0 0 .5 12a11.5 11.5 0 0 0 7.86 10.93c.57.1.79-.25.79-.55v-2c-3.2.7-3.88-1.36-3.88-1.36-.52-1.33-1.27-1.68-1.27-1.68-1.04-.71.08-.7.08-.7 1.15.08 1.75 1.18 1.75 1.18 1.02 1.75 2.68 1.24 3.34.94.1-.74.4-1.24.72-1.52-2.55-.29-5.24-1.27-5.24-5.67 0-1.25.45-2.28 1.18-3.08-.12-.29-.51-1.46.11-3.04 0 0 .96-.31 3.15 1.17a10.9 10.9 0 0 1 5.74 0c2.18-1.48 3.14-1.17 3.14-1.17.63 1.58.24 2.75.12 3.04.74.8 1.18 1.83 1.18 3.08 0 4.41-2.69 5.38-5.25 5.66.41.36.77 1.06.77 2.13v3.16c0 .3.21.66.8.55A11.5 11.5 0 0 0 23.5 12 11.5 11.5 0 0 0 12 .5Z"/>
+    </svg>
   );
 }
 
 function GoogleGlyph() {
   return (
-    <svg width="16" height="16" viewBox="0 0 48 48" aria-hidden>
-      <path fill="#EA4335" d="M24 9.5c3.9 0 7.4 1.4 10.1 3.6l7.5-7.5C37.3 1.7 31 0 24 0 14.7 0 6.7 5.4 2.9 13.3l8.6 6.7C13.4 14 18.3 9.5 24 9.5z"/>
-      <path fill="#4285F4" d="M46.1 24.6c0-1.6-.2-3.2-.4-4.7H24v9h12.5c-.5 2.9-2.1 5.3-4.5 7l7.1 5.5c4.1-3.8 6.5-9.4 6.5-16.8z"/>
-      <path fill="#FBBC05" d="M11.5 28.4c-.6-1.8-1-3.7-1-5.7s.4-3.9 1-5.7L2.9 10.3C1 14 0 18.4 0 24c0 5.6 1 10 2.9 13.7l8.6-6.7z"/>
-      <path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.1-5.5c-2 1.4-4.6 2.3-8.8 2.3-5.7 0-10.6-4.5-12.5-10.6l-8.6 6.7C6.7 42.6 14.7 48 24 48z"/>
-      <path fill="none" d="M0 0h48v48H0z"/>
+    <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden>
+      <path fill="#EA4335" d="M12 10.2v3.9h5.5c-.2 1.3-1.7 3.9-5.5 3.9a6.1 6.1 0 1 1 0-12.2c1.9 0 3.2.8 4 1.5l2.7-2.6C16.9 3 14.7 2 12 2a10 10 0 1 0 0 20c5.8 0 9.6-4 9.6-9.8 0-.7-.1-1.2-.2-1.7H12Z"/>
+      <path fill="#4285F4" d="M21.4 10.5H12v3.9h5.5c-.2 1.3-1.7 3.9-5.5 3.9v3.6c5.7 0 9.6-4 9.6-9.8 0-.7-.1-1.2-.2-1.6Z"/>
+      <path fill="#FBBC05" d="M6 14.3a6 6 0 0 1 0-4.5l-3-2.4a10 10 0 0 0 0 9.3l3-2.4Z"/>
+      <path fill="#34A853" d="M12 22c2.6 0 4.9-.9 6.5-2.4l-3-2.3c-.9.6-2 1-3.5 1-2.7 0-5-1.9-5.8-4.5L3 15.6A10 10 0 0 0 12 22Z"/>
     </svg>
   );
 }

@@ -1,64 +1,90 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import Image from 'next/image';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { parseRepoIdentifier } from '@/lib/github/files';
+import * as React from "react";
+import { useRouter } from "next/navigation";
+import Image from "next/image";
+import { useTheme } from "next-themes";
+import { createClient } from "@/lib/supabase/client";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { normalizeRepoInput } from "@/lib/utils";
+import { toast } from "sonner";
+import { ArrowRight, Github } from "lucide-react";
 
 export default function OnboardingPage() {
-  const [value, setValue] = useState('');
-  const [err, setErr] = useState<string | null>(null);
   const router = useRouter();
+  const { resolvedTheme } = useTheme();
+  const [value, setValue] = React.useState("");
+  const [provider, setProvider] = React.useState<"github" | "google" | null>(null);
 
-  function submit() {
-    const ref = parseRepoIdentifier(value);
-    if (!ref) {
-      setErr('Enter a full GitHub URL or `owner/repo`.');
+  React.useEffect(() => {
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      const appMetaProvider =
+        (user?.app_metadata?.provider as string | undefined) ?? null;
+      if (appMetaProvider === "github") setProvider("github");
+      else if (appMetaProvider === "google") setProvider("google");
+    });
+  }, []);
+
+  function submit(e: React.FormEvent) {
+    e.preventDefault();
+    const normalized = normalizeRepoInput(value);
+    if (!normalized) {
+      toast.error("Enter owner/repo or a github.com URL.");
       return;
     }
-    const normalized = `${ref.owner}/${ref.name}`;
     router.push(`/onboarding/scanning?repo=${encodeURIComponent(normalized)}`);
   }
 
+  const iconSrc =
+    resolvedTheme === "light"
+      ? "/brand/autodsm-icon-light.svg"
+      : "/brand/autodsm-icon-dark.svg";
+
   return (
-    <main className="min-h-screen flex items-center justify-center surface-primary px-4">
-      <div
-        className="w-full max-w-[480px] rounded-2xl border border-t-default p-6 md:p-10"
-        style={{ background: 'var(--bg-elevated)' }}
-      >
-        <div className="flex justify-center">
-          <Image src="/brand/autodsm-icon-light.svg" alt="autoDSM" width={32} height={32} />
-        </div>
-        <h1 className="mt-6 text-center font-display font-semibold text-[24px] text-t-primary">
-          Connect a repository
-        </h1>
-        <p className="mt-2 text-center text-[14px] text-t-secondary">
-          autoDSM will scan your repo and build a living design system from your source code.
+    <div className="min-h-screen grid place-items-center bg-[var(--bg-primary)] px-6">
+      <div className="w-full max-w-[460px] rounded-xl border border-[var(--border-default)] bg-[var(--bg-elevated)] p-10">
+        <Image src={iconSrc} alt="" width={28} height={28} aria-hidden priority />
+        <h2 className="mt-6 text-h2 text-[var(--text-primary)]">Connect a repository</h2>
+        <p className="mt-2 text-body-s text-[var(--text-secondary)]">
+          Paste a GitHub URL or <code className="text-mono text-[12px] text-[var(--text-primary)]">owner/repo</code>.
+          {provider === "google"
+            ? " Install the GitHub App for private repos."
+            : " Public repos work out of the box."}
         </p>
 
-        <div className="mt-8 flex flex-col gap-4">
-          <div>
-            <label className="text-[13px] font-medium text-t-secondary">Paste a public GitHub repository URL</label>
-            <Input
-              placeholder="github.com/shadcn-ui/ui"
-              value={value}
-              onChange={(e) => { setValue(e.target.value); setErr(null); }}
-              onKeyDown={(e) => { if (e.key === 'Enter') submit(); }}
-              className="mt-2"
-            />
-            {err && <p className="mt-2 text-[12px] text-[var(--error)]">{err}</p>}
-          </div>
-          <Button onClick={submit} size="lg" className="w-full">Continue</Button>
-          <p className="text-center text-[12px] text-t-tertiary">
-            Need private repo access?{' '}
-            <a className="underline underline-offset-2 hover:text-t-secondary" href="https://github.com/apps/autodsm/installations/new" target="_blank" rel="noreferrer">
-              Connect GitHub →
+        <form className="mt-6 flex flex-col gap-3" onSubmit={submit}>
+          <Input
+            placeholder="vercel/next.js"
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            className="h-11 text-[14px]"
+            autoFocus
+          />
+          <Button type="submit" size="lg" className="w-full">
+            Scan repository
+            <ArrowRight size={15} strokeWidth={1.8} />
+          </Button>
+        </form>
+
+        {provider !== "github" && (
+          <div className="mt-6 pt-6 border-t border-[var(--border-subtle)]">
+            <a
+              href="https://github.com/apps/autodsm"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 text-[13px] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
+            >
+              <Github size={14} strokeWidth={1.5} />
+              Install autoDSM on GitHub →
             </a>
-          </p>
-        </div>
+            <p className="mt-2 text-[12px] text-[var(--text-tertiary)]">
+              Required for private repositories.
+            </p>
+          </div>
+        )}
       </div>
-    </main>
+    </div>
   );
 }

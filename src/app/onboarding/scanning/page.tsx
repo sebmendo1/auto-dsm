@@ -1,109 +1,141 @@
-'use client';
+"use client";
 
-import { Suspense, useEffect, useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
-import Image from 'next/image';
+import * as React from "react";
+import Image from "next/image";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useTheme } from "next-themes";
 
-interface Progress {
-  phase: string;
-  message: string;
-  current?: number;
-  total?: number;
+const STEPS = [
+  "Fetching repository…",
+  "Detecting framework…",
+  "Parsing CSS variables…",
+  "Parsing Tailwind config…",
+  "Extracting 12 token categories…",
+  "Scanning assets…",
+  "Done. Redirecting…",
+];
+
+function ScanningPageInner() {
+  const router = useRouter();
+  const params = useSearchParams();
+  const repo = params.get("repo");
+  const { resolvedTheme } = useTheme();
+  const [log, setLog] = React.useState<string[]>([]);
+  const [error, setError] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    if (!repo) {
+      router.replace("/onboarding");
+      return;
+    }
+
+    const controller = new AbortController();
+
+    (async () => {
+      try {
+        const res = await fetch("/api/scan", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ repo }),
+          signal: controller.signal,
+        });
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          if (body.unsupported) {
+            router.replace(
+              `/onboarding/unsupported?repo=${encodeURIComponent(repo)}&reason=${encodeURIComponent(body.unsupported)}`,
+            );
+            return;
+          }
+          setError(body.error ?? `Scan failed (${res.status})`);
+          return;
+        }
+        const body = await res.json();
+        if (body.status === "completed") {
+          router.replace("/dashboard");
+        } else if (body.unsupported) {
+          router.replace(
+            `/onboarding/unsupported?repo=${encodeURIComponent(repo)}&reason=${encodeURIComponent(body.unsupported)}`,
+          );
+        } else {
+          setError(body.error ?? "Unknown scan status");
+        }
+      } catch (e) {
+        if ((e as Error).name !== "AbortError") {
+          setError((e as Error).message);
+        }
+      }
+    })();
+
+    // Fake progress ticker (real SSE hookup can replace this)
+    let i = 0;
+    const tick = setInterval(() => {
+      if (i >= STEPS.length) {
+        clearInterval(tick);
+        return;
+      }
+      setLog((l) => [...l, STEPS[i]]);
+      i++;
+    }, 700);
+
+    return () => {
+      controller.abort();
+      clearInterval(tick);
+    };
+  }, [repo, router]);
+
+  const iconSrc =
+    resolvedTheme === "light"
+      ? "/brand/autodsm-icon-light.svg"
+      : "/brand/autodsm-icon-dark.svg";
+
+  return (
+    <div className="min-h-screen grid place-items-center bg-[var(--bg-primary)] px-6">
+      <div className="w-full max-w-[520px] rounded-xl border border-[var(--border-default)] bg-[var(--bg-elevated)] p-10">
+        <Image
+          src={iconSrc}
+          alt=""
+          width={32}
+          height={32}
+          aria-hidden
+          className="autodsm-pulse"
+        />
+        <h2 className="mt-6 text-h2 text-[var(--text-primary)]">{repo ?? "—"}</h2>
+        <p className="mt-2 text-body-s text-[var(--text-secondary)]">
+          Building your brand book.
+        </p>
+
+        <div className="mt-6 space-y-1 font-[var(--font-geist-mono)] text-[13px] text-[var(--text-secondary)]">
+          {log.map((line, idx) => (
+            <div
+              key={idx}
+              className={
+                idx === log.length - 1
+                  ? "text-[var(--text-primary)]"
+                  : "text-[var(--text-tertiary)]"
+              }
+            >
+              {line}
+            </div>
+          ))}
+        </div>
+
+        {error ? (
+          <div className="mt-6 rounded-[8px] border border-[color-mix(in_srgb,var(--error)_30%,transparent)] bg-[color-mix(in_srgb,var(--error)_8%,transparent)] p-3 text-[13px] text-[var(--error)]">
+            {error}
+          </div>
+        ) : (
+          <div className="mt-6 h-1 rounded-full bg-[var(--bg-tertiary)] overflow-hidden relative autodsm-indeterminate" />
+        )}
+      </div>
+    </div>
+  );
 }
 
 export default function ScanningPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen" />}>
-      <ScanningInner />
-    </Suspense>
-  );
-}
-
-function ScanningInner() {
-  const router = useRouter();
-  const params = useSearchParams();
-  const repo = params.get('repo') ?? '';
-  const [status, setStatus] = useState<Progress>({
-    phase: 'fetching',
-    message: 'Fetching repository…',
-  });
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!repo) return;
-    const es = new EventSource(`/api/scan/stream?repo=${encodeURIComponent(repo)}`);
-    es.onmessage = (ev) => {
-      try {
-        const data = JSON.parse(ev.data) as Progress & { reason?: string };
-        setStatus(data);
-        if (data.phase === 'done') {
-          es.close();
-          setTimeout(() => {
-            router.push(`/dashboard?repo=${encodeURIComponent(repo)}`);
-          }, 500);
-        } else if (data.phase === 'unsupported') {
-          es.close();
-          router.push(`/onboarding/unsupported?reason=${encodeURIComponent(data.reason ?? '')}&repo=${encodeURIComponent(repo)}`);
-        } else if (data.phase === 'error') {
-          setError(data.message ?? 'Scan failed.');
-          es.close();
-        }
-      } catch { /* ignore */ }
-    };
-    es.onerror = () => {
-      setError('Connection to scanner lost.');
-      es.close();
-    };
-    return () => es.close();
-  }, [repo, router]);
-
-  const [owner, name] = repo.split('/');
-
-  return (
-    <main className="min-h-screen flex items-center justify-center surface-primary px-4">
-      <div className="w-full max-w-[520px] flex flex-col items-center text-center">
-        <Image
-          src="/brand/autodsm-icon-light.svg"
-          alt="autoDSM"
-          width={40}
-          height={40}
-          className="animate-brand-pulse"
-        />
-        <h1 className="mt-6 font-display font-semibold text-[22px] text-t-primary">
-          {owner && name ? (
-            <>
-              <span className="text-t-secondary">{owner}</span>
-              <span className="text-t-tertiary"> / </span>
-              <span>{name}</span>
-            </>
-          ) : 'Scanning…'}
-        </h1>
-        <p className="mt-3 text-[14px] text-t-secondary min-h-[22px]">
-          {error ? <span className="text-[var(--error)]">{error}</span> : status.message}
-        </p>
-
-        <div className="mt-6 w-full h-1 rounded-full bg-[var(--border-subtle)] overflow-hidden">
-          <div
-            className="h-full w-1/3 bg-[var(--accent)] animate-sweep"
-            style={{ borderRadius: 999 }}
-          />
-        </div>
-
-        {typeof status.current === 'number' && typeof status.total === 'number' && (
-          <p className="mt-3 text-[12px] text-t-tertiary font-mono">
-            {status.current}/{status.total} components parsed
-          </p>
-        )}
-
-        {error && (
-          <button
-            onClick={() => router.push('/onboarding')}
-            className="mt-6 text-[13px] text-t-secondary hover:text-t-primary underline underline-offset-4"
-          >
-            ← Connect a different repository
-          </button>
-        )}
-      </div>
-    </main>
+    <React.Suspense fallback={null}>
+      <ScanningPageInner />
+    </React.Suspense>
   );
 }
