@@ -1,5 +1,9 @@
 @import "tailwindcss";
 
+/* next-themes uses class="light" | "dark" on <html>. Tailwind v4 defaults `dark:`
+   to prefers-color-scheme, which fights the in-app toggle — override to class-based. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 /* ──────────────────────────────────────────────────────────────────────────
    autoDSM design tokens (PDF §2)
    Default theme = dark. Light is opt-in via `.light` or via html[data-theme].
