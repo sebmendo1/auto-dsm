@@ -66,6 +66,13 @@ https://<your-production-domain>/auth/callback
 https://<your-preview-deployment>.vercel.app/auth/callback
 ```
 
+**Current production deploys** (add each to **Redirect URLs** if you use that origin):
+
+- `https://autodsm.vercel.app/auth/callback`
+- `https://www.autodsm.ai/auth/callback` (production alias on the Vercel project)
+
+Vercel **Production** should also define `NEXT_PUBLIC_APP_URL` to the same primary origin you use as **Site URL** (e.g. `https://autodsm.vercel.app` with no trailing slash).
+
 For rotating Vercel preview URLs, either:
 
 - Add each preview URL after deploy, or  

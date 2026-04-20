@@ -34,6 +34,11 @@ export function getSupabasePublicKey(): string | undefined {
   );
 }
 
+/** True when browser/server bundle has both URL and public key (no throw). */
+export function isSupabasePublicConfigured(): boolean {
+  return Boolean(getSupabaseUrl() && getSupabasePublicKey());
+}
+
 export function requireSupabasePublicConfig(): { url: string; key: string } {
   const url = getSupabaseUrl();
   const key = getSupabasePublicKey();

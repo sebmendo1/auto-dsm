@@ -2,13 +2,18 @@
 
 import * as React from "react";
 import { createClient } from "@/lib/supabase/client";
+import { isSupabasePublicConfigured } from "@/lib/supabase/env";
 import { ProductIcon } from "@/components/brand/product-mark";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 
+const SUPABASE_SETUP_MESSAGE =
+  "Supabase is not configured. Add NEXT_PUBLIC_SUPABASE_URL and a public key (NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY or NEXT_PUBLIC_SUPABASE_ANON_KEY). On Vercel you can also use SUPABASE_URL and SUPABASE_ANON_KEY from the Supabase integration — then redeploy.";
+
 export default function LoginPage() {
   const [loading, setLoading] = React.useState<"github" | "google" | null>(null);
   const [errorFromQuery, setErrorFromQuery] = React.useState<string | null>(null);
+  const supabaseReady = React.useMemo(() => isSupabasePublicConfigured(), []);
 
   React.useEffect(() => {
     const url = new URL(window.location.href);
@@ -17,6 +22,10 @@ export default function LoginPage() {
   }, []);
 
   async function signIn(provider: "github" | "google") {
+    if (!supabaseReady) {
+      toast.error(SUPABASE_SETUP_MESSAGE);
+      return;
+    }
     setLoading(provider);
     try {
       const supabase = createClient();
@@ -53,13 +62,27 @@ export default function LoginPage() {
           </p>
         ) : null}
 
+        {!supabaseReady ? (
+          <div
+            className="mt-4 flex gap-3 rounded-lg border border-[var(--border-default)] bg-[var(--bg-secondary)] p-4 text-left"
+            role="alert"
+          >
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--text-primary)] text-[var(--bg-primary)] text-sm font-semibold">
+              !
+            </span>
+            <p className="text-[13px] leading-[18px] text-[var(--text-secondary)]">
+              {SUPABASE_SETUP_MESSAGE}
+            </p>
+          </div>
+        ) : null}
+
         <div className="mt-8 flex flex-col gap-3">
           <Button
             type="button"
             size="lg"
             className="w-full bg-[var(--text-primary)] text-[var(--bg-primary)] hover:opacity-90"
             onClick={() => signIn("github")}
-            disabled={loading !== null}
+            disabled={loading !== null || !supabaseReady}
           >
             <GithubGlyph />
             {loading === "github" ? "Redirecting…" : "Continue with GitHub"}
@@ -71,7 +94,7 @@ export default function LoginPage() {
             size="lg"
             className="w-full"
             onClick={() => signIn("google")}
-            disabled={loading !== null}
+            disabled={loading !== null || !supabaseReady}
           >
             <GoogleGlyph />
             {loading === "google" ? "Redirecting…" : "Continue with Google"}
