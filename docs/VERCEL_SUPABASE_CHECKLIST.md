@@ -24,7 +24,8 @@ Use this checklist so the **contribute build** on Vercel uses **`brand-book-v1`*
 
 | Setting | Value |
 |---------|--------|
-| Framework | Next.js |
+| **Root Directory** | **`.` (repo root)** — must be the folder that contains this repo’s `package.json` and `package-lock.json`. If you see *“No Next.js version detected”*, the Root Directory is almost always wrong (e.g. parent monorepo folder, or a subpath that does not contain `next` in `package.json`). |
+| Framework | Next.js (also set in [`vercel.json`](../vercel.json)) |
 | Install | `npm install` (repo uses `package-lock.json`; `pnpm` is optional if you align lockfiles) |
 | Build | `npm run build` |
 | Output | Default (Next.js) |
@@ -43,6 +44,7 @@ Set in **Project → Settings → Environment Variables** for **Preview** and/or
 | `NEXT_PUBLIC_SUPABASE_URL` | `https://mujlucfkoqvghvdikkhw.supabase.co` |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | From Supabase Dashboard → **Project Settings → API** (publishable / anon-style key used by the browser) |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Optional legacy fallback if you do not use publishable key |
+| `SUPABASE_URL` / `SUPABASE_ANON_KEY` | Optional: some Vercel or Supabase integrations add these **without** `NEXT_PUBLIC_`. This repo’s [`next.config.mjs`](../next.config.mjs) maps them into the client bundle at build time so login works without duplicating keys. |
 | `SUPABASE_SERVICE_ROLE_KEY` | Server-only; only if routes need to bypass RLS (keep out of client) |
 | `NEXT_PUBLIC_APP_URL` | **Exact** deployed origin, e.g. `https://autodsm.vercel.app` or your custom domain (no trailing slash) |
 

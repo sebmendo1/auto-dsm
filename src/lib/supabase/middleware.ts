@@ -1,5 +1,6 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { getSupabasePublicKey, getSupabaseUrl } from "./env";
 
 type CookieToSet = { name: string; value: string; options?: CookieOptions };
 
@@ -14,15 +15,13 @@ type CookieToSet = { name: string; value: string; options?: CookieOptions };
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });
 
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key =
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const url = getSupabaseUrl();
+  const key = getSupabasePublicKey();
 
   if (!url || !key) {
     if (process.env.NODE_ENV !== "production") {
       console.warn(
-        "[middleware] Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY (or NEXT_PUBLIC_SUPABASE_ANON_KEY) — skipping session refresh.",
+        "[middleware] Missing Supabase URL or public key (NEXT_PUBLIC_SUPABASE_URL / SUPABASE_URL and publishable or anon key) — skipping session refresh.",
       );
     }
     return response;
