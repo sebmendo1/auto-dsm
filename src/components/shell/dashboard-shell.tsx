@@ -158,7 +158,7 @@ export function DashboardShell({
         <div className="flex min-h-0 min-w-0 flex-1">
           <Sidebar userLabel={userLabel} />
           <div className="flex min-h-0 min-w-0 flex-1 flex-col pt-0 px-3 pb-3">
-            <div className="flex min-h-0 min-w-0 flex-1 flex-col justify-center overflow-hidden rounded-xl border-[0.5px] border-[lch(90.84_0_282)] bg-white shadow-[lch(0_0_0_/_0.02)_0px_3px_6px_-2px,_lch(0_0_0_/_0.04)_0px_1px_1px]">
+            <div className="flex min-h-0 min-w-0 flex-1 flex-col justify-center overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-elevated)] shadow-[var(--shadow-sm)]">
               <TopBar />
               <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain">
                 {children}

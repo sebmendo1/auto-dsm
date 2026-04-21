@@ -24,7 +24,7 @@ export function Sidebar({ userLabel }: { userLabel?: string }) {
       )}
     >
       <ScrollArea
-        className="relative h-full min-h-0 w-full flex-1 pr-0.5 flex flex-col justify-start items-stretch"
+        className="relative h-full min-h-0 w-full flex-1 flex flex-col justify-start items-stretch"
         viewportClassName="h-full min-h-0 w-full flex flex-col justify-start items-stretch"
       >
         <DashboardNavLinks userLabel={userLabel} />

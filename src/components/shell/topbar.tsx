@@ -28,23 +28,6 @@ export function TopBar() {
   const pathname = usePathname();
   const title = sectionTitleFromPath(pathname);
 
-  const segments = pathname.split("/").filter(Boolean);
-  const dashboardSlug = segments[1] ?? "";
-  const isDesignTokensOrStructureSubsection = [
-    "colors",
-    "typography",
-    "assets",
-    "spacing",
-    "shadows",
-    "radii",
-    "borders",
-    "animations",
-    "gradients",
-    "opacity",
-    "zindex",
-    "breakpoints",
-  ].includes(dashboardSlug);
-
   /** Agent uses a minimal hero + composer; repo title row would duplicate the shell chrome. */
   if (pathname === "/dashboard/agent") {
     return null;
@@ -53,8 +36,8 @@ export function TopBar() {
   return (
     <div
       className={[
-          "flex h-fit w-full shrink-0 items-center justify-between bg-white px-4 py-3",
-          "border-b border-transparent [border-bottom-color:rgba(32,33,34,0.04)]",
+          "flex h-fit w-full shrink-0 items-center justify-between bg-[var(--bg-elevated)] px-4 py-3",
+          "border-b border-transparent dark:border-[var(--border-subtle)]",
       ].join(" ")}
     >
       <div className="flex min-w-0 items-center">

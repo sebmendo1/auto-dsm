@@ -56,13 +56,13 @@ function SidebarNavIcon({
   return (
     <Icon
       size={size}
-      strokeWidth={active ? 2.5 : 2}
-      fill={active ? "currentColor" : "none"}
+      strokeWidth={active ? 2.25 : 2}
+      fill="none"
       className={cn(
         "shrink-0 pointer-events-none transition-[stroke-width,fill] duration-150",
         active ? "font-medium" : "font-semibold",
         active
-          ? "text-[var(--accent)]"
+          ? "text-[var(--text-primary)]"
           : muted
             ? "text-[var(--text-tertiary)]"
             : "text-[var(--text-secondary)]",
@@ -97,12 +97,19 @@ function NavLink({
       href={href}
       onClick={() => onNavigate?.()}
       className={cn(
-        "flex h-8 min-h-8 w-full items-center gap-2 rounded-md text-[12px] leading-4",
+        "flex h-8 min-h-8 items-center gap-2 rounded-md text-[12px] leading-4",
         "transition-colors duration-150 [transition-timing-function:var(--ease-standard)]",
-        topLevel ? "px-3" : "pl-4 pr-3",
+        topLevel ? "w-[224px] px-3" : "w-[224px] pl-4 pr-1",
         active
-          ? "bg-[var(--accent-subtle)] font-medium text-[var(--accent)]"
-          : "text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]",
+          ? [
+              "bg-[var(--bg-elevated)] font-medium text-[var(--text-primary)]",
+              "border border-[var(--border-subtle)] shadow-[var(--shadow-sm)]",
+            ].join(" ")
+          : [
+              "text-[var(--text-secondary)] hover:text-[var(--text-primary)]",
+              "hover:bg-[var(--bg-secondary)] active:bg-[var(--bg-secondary)]",
+              "dark:hover:bg-[var(--bg-tertiary)] dark:active:bg-[var(--bg-elevated)]",
+            ].join(" "),
         muted && !active && "text-[var(--text-tertiary)]",
       )}
     >
@@ -132,8 +139,8 @@ export function DashboardNavLinks({
   }
 
   return (
-    <div className="flex h-full min-h-0 w-full flex-1 flex-col justify-center items-start">
-      <nav className="flex h-fit w-full flex-col gap-3 pr-0.5">
+    <div className="flex h-full min-h-0 w-full flex-1 flex-col justify-center items-stretch">
+      <nav className="flex h-fit w-full flex-col gap-3">
         <div className="flex flex-col gap-0">
           <NavLink
             href="/dashboard/agent"
@@ -160,7 +167,13 @@ export function DashboardNavLinks({
               <button
                 type="button"
                 onClick={() => setOpenSections((s) => ({ ...s, [section.label]: !open }))}
-                className="flex w-full items-center justify-between gap-2 px-3 pb-2 text-left text-caption font-semibold tracking-widest text-[var(--text-tertiary)] transition-colors hover:text-[var(--text-secondary)]"
+                className={[
+                  "flex w-[224px] items-center justify-between gap-2 px-3 pb-2 text-left text-caption font-semibold tracking-widest",
+                  "text-[var(--text-tertiary)] transition-colors hover:text-[var(--text-secondary)]",
+                  "hover:bg-[var(--bg-secondary)]/40 active:bg-[var(--bg-secondary)]/55",
+                  "dark:hover:bg-[var(--bg-tertiary)]/35 dark:active:bg-[var(--bg-elevated)]/55",
+                  "rounded-md",
+                ].join(" ")}
               >
                 <span>{section.label}</span>
                 {open ? (

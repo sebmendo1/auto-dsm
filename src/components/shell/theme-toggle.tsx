@@ -21,7 +21,8 @@ export function ThemeToggle({ className }: { className?: string }) {
       aria-label="Toggle theme"
       className={cn(
         "inline-flex items-center justify-center h-8 w-8 rounded-md",
-        "text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]",
+        "text-[var(--text-tertiary)] hover:text-[var(--text-primary)]",
+        "hover:bg-[var(--bg-secondary)] active:bg-[var(--bg-secondary)] dark:hover:bg-[var(--bg-tertiary)] dark:active:bg-[var(--bg-elevated)]",
         "transition-colors duration-150 [transition-timing-function:var(--ease-standard)]",
         className,
       )}

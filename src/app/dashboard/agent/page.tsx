@@ -52,18 +52,17 @@ export default function AgentPage() {
             onSubmit={handleSubmit}
             className="mt-9 w-full max-w-[560px] sm:mt-10"
           >
-            <div className="relative rounded-xl bg-[var(--bg-secondary)] p-4 pb-12 shadow-[var(--shadow-sm)]">
+            <div className="relative flex min-h-[140px] flex-col rounded-xl bg-[var(--bg-secondary)] p-4 pb-12 shadow-[var(--shadow-sm)]">
               <label htmlFor="agent-prompt" className="sr-only">
                 Ask about your design system or brand
               </label>
               <textarea
                 id="agent-prompt"
-                rows={5}
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 placeholder="Ask any questions about your design system or brand"
                 className={cn(
-                  "w-full resize-none border-0 bg-transparent text-sm leading-relaxed text-[var(--text-primary)]",
+                  "min-h-0 w-full flex-1 resize-none border-0 bg-transparent text-sm leading-relaxed text-[var(--text-primary)]",
                   "placeholder:text-[var(--text-tertiary)] focus:outline-none",
                 )}
                 style={{ fontFamily: "var(--font-geist-sans)" }}
