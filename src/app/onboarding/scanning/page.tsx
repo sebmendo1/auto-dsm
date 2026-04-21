@@ -19,6 +19,7 @@ function ScanningPageInner() {
   const router = useRouter();
   const params = useSearchParams();
   const repo = params.get("repo");
+  const projectName = params.get("projectName");
   const [log, setLog] = React.useState<string[]>([]);
   const [error, setError] = React.useState<string | null>(null);
 
@@ -35,7 +36,7 @@ function ScanningPageInner() {
         const res = await fetch("/api/scan", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ repo }),
+          body: JSON.stringify({ repo, projectName }),
           signal: controller.signal,
         });
         if (!res.ok) {

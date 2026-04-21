@@ -41,7 +41,7 @@ function hasTsxOrTs(tree: TreeEntry[]): boolean {
  * 4. Upserts brand_repos with the resulting BrandProfile JSONB.
  */
 export async function POST(req: NextRequest) {
-  let body: { repo?: string };
+  let body: { repo?: string; projectName?: string };
   try {
     body = await req.json();
   } catch {
@@ -56,6 +56,7 @@ export async function POST(req: NextRequest) {
     );
   }
   const [owner, name] = slug.split("/");
+  const projectName = (body.projectName ?? "").trim() || name;
 
   const supabase = await createClient();
   const {
@@ -250,6 +251,13 @@ export async function POST(req: NextRequest) {
         (shadcnJson ? 1 : 0) +
         1,
     });
+    profile = {
+      ...profile,
+      meta: {
+        ...profile.meta,
+        projectName,
+      },
+    };
   } catch (e) {
     const message = e instanceof Error ? e.message : "Unknown error";
     console.error("[scan] buildBrandProfile failed:", message);

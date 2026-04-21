@@ -56,7 +56,7 @@ function SidebarNavIcon({
   return (
     <Icon
       size={size}
-      strokeWidth={active ? 2.25 : 1.5}
+      strokeWidth={active ? 2.5 : 2}
       fill={active ? "currentColor" : "none"}
       className={cn(
         "shrink-0 pointer-events-none transition-[stroke-width,fill] duration-150",
@@ -97,7 +97,7 @@ function NavLink({
       href={href}
       onClick={() => onNavigate?.()}
       className={cn(
-        "flex h-8 min-h-8 items-center gap-2 rounded-md text-[12px] leading-4",
+        "flex h-8 min-h-8 w-full items-center gap-2 rounded-md text-[12px] leading-4",
         "transition-colors duration-150 [transition-timing-function:var(--ease-standard)]",
         topLevel ? "px-3" : "pl-4 pr-3",
         active
@@ -132,24 +132,26 @@ export function DashboardNavLinks({
   }
 
   return (
-    <>
-      <nav className="pr-0.5">
-        <NavLink
-          href="/dashboard/agent"
-          label="New agent"
-          Icon={Pen}
-          active={isActive("/dashboard/agent")}
-          topLevel
-          onNavigate={onNavigate}
-        />
-        <NavLink
-          href="/dashboard"
-          label="Dashboard"
-          Icon={LayoutDashboard}
-          active={isActive("/dashboard")}
-          topLevel
-          onNavigate={onNavigate}
-        />
+    <div className="flex h-full min-h-0 w-full flex-1 flex-col justify-center items-start">
+      <nav className="flex h-fit w-full flex-col gap-3 pr-0.5">
+        <div className="flex flex-col gap-0">
+          <NavLink
+            href="/dashboard/agent"
+            label="New agent"
+            Icon={Pen}
+            active={isActive("/dashboard/agent")}
+            topLevel
+            onNavigate={onNavigate}
+          />
+          <NavLink
+            href="/dashboard"
+            label="Dashboard"
+            Icon={LayoutDashboard}
+            active={isActive("/dashboard")}
+            topLevel
+            onNavigate={onNavigate}
+          />
+        </div>
 
         {SIDEBAR_SECTIONS.map((section) => {
           const open = openSections[section.label] ?? true;
@@ -168,7 +170,7 @@ export function DashboardNavLinks({
                 )}
               </button>
               {open ? (
-                <div className="flex flex-col gap-0.5">
+                <div className="flex flex-col gap-0">
                   {section.items.map((slug) => {
                     const Icon = ICONS[slug];
                     const href = `/dashboard/${slug}`;
@@ -198,7 +200,7 @@ export function DashboardNavLinks({
         })}
       </nav>
 
-      <div className="shrink-0 border-t border-[var(--border-subtle)] pt-3">
+      <div className="mt-auto flex h-fit w-full shrink-0 flex-col pt-3">
         <NavLink
           href="/dashboard/settings"
           label="Settings"
@@ -208,8 +210,8 @@ export function DashboardNavLinks({
           onNavigate={onNavigate}
         />
         {userLabel ? (
-          <div className="mt-2 flex items-center gap-2 rounded-lg border-0 bg-[var(--bg-primary)] px-2.5 py-2 text-[12px] leading-4 text-[var(--text-secondary)] shadow-[var(--shadow-sm)]">
-            <div className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-[var(--accent-subtle)] text-[12px] font-medium text-[var(--accent)]">
+          <div className="mt-2 flex items-center gap-2 rounded-lg border-0 [background:unset] px-2.5 py-2 text-[12px] leading-4 text-[var(--text-secondary)] shadow-none">
+            <div className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-[var(--accent)] text-[12px] font-medium text-white">
               {userLabel.slice(0, 1).toUpperCase()}
             </div>
             <span className="min-w-0 flex-1 truncate">{userLabel}</span>
@@ -222,6 +224,6 @@ export function DashboardNavLinks({
           </div>
         ) : null}
       </div>
-    </>
+    </div>
   );
 }

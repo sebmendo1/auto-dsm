@@ -16,14 +16,17 @@ export function Sidebar({ userLabel }: { userLabel?: string }) {
       aria-hidden={hidden}
       inert={hidden ? true : undefined}
       className={cn(
-        "shrink-0 self-stretch min-h-0 sticky top-0 flex flex-col bg-[var(--bg-canvas)] font-medium",
+        "shrink-0 self-stretch min-h-0 sticky top-0 flex flex-col bg-[var(--bg-canvas)] font-semibold",
         "transition-[width,opacity,padding] duration-200 ease-out motion-reduce:transition-none",
         hidden
           ? "w-0 max-w-0 overflow-hidden border-0 p-0 opacity-0 pointer-events-none"
           : "h-full min-h-0 w-[240px] overflow-x-hidden pl-[8px] pr-0 pt-0 pb-[12px] opacity-100",
       )}
     >
-      <ScrollArea className="h-full min-h-0 flex-1 pr-0.5">
+      <ScrollArea
+        className="relative h-full min-h-0 w-full flex-1 pr-0.5 flex flex-col justify-start items-stretch"
+        viewportClassName="h-full min-h-0 w-full flex flex-col justify-start items-stretch"
+      >
         <DashboardNavLinks userLabel={userLabel} />
       </ScrollArea>
     </aside>

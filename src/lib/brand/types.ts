@@ -186,6 +186,8 @@ export interface BrandProfileMeta {
   tailwindConfigPath: string | null;
   shadcnConfigPath: string | null;
   tailwindVersion: "3" | "4" | null;
+  /** User-facing label captured during onboarding (shown in the sidebar). */
+  projectName?: string;
 }
 
 export interface BrandProfile {

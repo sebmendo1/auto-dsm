@@ -2,10 +2,6 @@
 
 import * as React from "react";
 import { usePathname } from "next/navigation";
-import { Github } from "lucide-react";
-import Link from "next/link";
-import { ThemeToggle } from "./theme-toggle";
-import { useBrandStore } from "@/stores/brand";
 import { CATEGORY_LABELS } from "@/lib/brand/types";
 
 /** Current dashboard tab title only (no repo slug in the chrome). */
@@ -30,8 +26,24 @@ function sectionTitleFromPath(pathname: string): string {
 
 export function TopBar() {
   const pathname = usePathname();
-  const profile = useBrandStore((s) => s.profile);
   const title = sectionTitleFromPath(pathname);
+
+  const segments = pathname.split("/").filter(Boolean);
+  const dashboardSlug = segments[1] ?? "";
+  const isDesignTokensOrStructureSubsection = [
+    "colors",
+    "typography",
+    "assets",
+    "spacing",
+    "shadows",
+    "radii",
+    "borders",
+    "animations",
+    "gradients",
+    "opacity",
+    "zindex",
+    "breakpoints",
+  ].includes(dashboardSlug);
 
   /** Agent uses a minimal hero + composer; repo title row would duplicate the shell chrome. */
   if (pathname === "/dashboard/agent") {
@@ -39,23 +51,14 @@ export function TopBar() {
   }
 
   return (
-    <div className="flex h-14 shrink-0 items-center justify-between border-b border-transparent bg-[var(--bg-secondary)]/40 px-6 backdrop-blur-[2px]">
+    <div
+      className={[
+          "flex h-fit w-full shrink-0 items-center justify-between bg-white px-4 py-3",
+          "border-b border-transparent [border-bottom-color:rgba(32,33,34,0.04)]",
+      ].join(" ")}
+    >
       <div className="flex min-w-0 items-center">
         <span className="truncate text-body-s font-medium text-[var(--text-primary)]">{title}</span>
-      </div>
-      <div className="flex items-center gap-1">
-        {profile?.repo?.url ? (
-          <Link
-            href={profile.repo.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-md text-[13px] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors"
-          >
-            <Github size={14} strokeWidth={1.5} />
-            <span>View on GitHub</span>
-          </Link>
-        ) : null}
-        <ThemeToggle />
       </div>
     </div>
   );

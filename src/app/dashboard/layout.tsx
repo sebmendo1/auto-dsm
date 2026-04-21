@@ -30,12 +30,8 @@ export default async function DashboardLayout({
   if (isDevAuthBypassEnabled()) {
     userLabel = `Dev preview · ${getDevPreviewRepoSlug()}`;
   } else {
-    if (!user) redirect("/login");
-    userLabel =
-      (user.user_metadata?.user_name as string | undefined) ??
-      (user.user_metadata?.full_name as string | undefined) ??
-      user.email ??
-      "You";
+    const repoName = brand.profile?.repo?.name ?? brand.repoSlug.split("/")[1] ?? "Project";
+    userLabel = brand.profile?.meta?.projectName ?? repoName;
   }
 
   return (

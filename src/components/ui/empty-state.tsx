@@ -14,7 +14,7 @@ export function EmptyState({ icon, title, description, action, className }: Prop
     <div
       className={cn(
         "flex flex-col items-center justify-center text-center",
-        "rounded-xl border-0 bg-[var(--bg-secondary)] shadow-[var(--shadow-sm)]",
+        "rounded-xl border-0 [background:unset] shadow-none",
         "px-8 py-16",
         className,
       )}

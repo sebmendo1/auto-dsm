@@ -105,8 +105,8 @@
   /* Surfaces */
   --bg-primary: #ffffff;
   --bg-secondary: #f7f7f8;
-  --bg-tertiary: #efeff1;
-  --bg-canvas: #fafafa;
+  --bg-tertiary: #ffffff;
+  --bg-canvas: #F3F3F4;
   --bg-elevated: #ffffff;
 
   /* Borders */
@@ -265,6 +265,7 @@ body {
   background: var(--bg-primary);
   color: var(--text-primary);
   font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  width: 100%;
   /* Slight fluid scale: keeps dashboard + tokens readable, improves small/large viewports */
   font-size: clamp(14px, 0.8125rem + 0.35vw, 16px);
   line-height: 1.571;
@@ -280,6 +281,10 @@ html {
 }
 html.light {
   color-scheme: light;
+}
+
+svg.lucide {
+  font-weight: 700;
 }
 
 ::selection {
@@ -311,7 +316,7 @@ html.light {
 }
 .text-h3 {
   font-family: var(--font-manrope), ui-sans-serif, system-ui, sans-serif;
-  font-weight: 600;
+  font-weight: 800;
   font-size: clamp(1.0625rem, 0.95rem + 0.55vw, 1.125rem);
   line-height: 1.35;
   letter-spacing: -0.005em;
@@ -379,6 +384,11 @@ html.light {
 }
 ::-webkit-scrollbar-thumb:hover {
   background: var(--border-strong);
+}
+
+/* Radix ScrollArea: ensure viewport content wrapper can stretch to full height. */
+[data-radix-scroll-area-viewport] > div {
+  height: 100%;
 }
 
 /* Subtle onboarding pulse ─────────────────────────────────────────────── */

@@ -222,10 +222,10 @@ export default function TypographyPage() {
 
                 {/* Spec block */}
                 <div
-                  className="w-[240px] shrink-0 text-[var(--text-secondary)] space-y-0.5"
+                  className="w-full shrink-0 text-[var(--text-secondary)] space-y-0.5"
                   style={{ fontFamily: "var(--font-geist-mono)", fontSize: 12 }}
                 >
-                  <div className="text-[var(--text-primary)] font-medium">
+                  <div className="text-[var(--text-primary)] font-semibold">
                     {type.name}
                   </div>
                   <div>

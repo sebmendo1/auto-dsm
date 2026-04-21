@@ -24,6 +24,7 @@ export function buildDemoBrandProfile(owner: string, name: string): BrandProfile
       tailwindConfigPath: "tailwind.config.ts",
       shadcnConfigPath: "components.json",
       tailwindVersion: "4",
+      projectName: name,
     },
     colors: [
       {
