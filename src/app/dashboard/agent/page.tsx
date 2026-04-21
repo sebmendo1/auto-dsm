@@ -52,7 +52,7 @@ export default function AgentPage() {
             onSubmit={handleSubmit}
             className="mt-9 w-full max-w-[560px] sm:mt-10"
           >
-            <div className="relative rounded-2xl bg-[var(--bg-secondary)] p-4 pb-12 shadow-[var(--shadow-sm)]">
+            <div className="relative rounded-xl bg-[var(--bg-secondary)] p-4 pb-12 shadow-[var(--shadow-sm)]">
               <label htmlFor="agent-prompt" className="sr-only">
                 Ask about your design system or brand
               </label>
@@ -113,7 +113,7 @@ export default function AgentPage() {
             onSubmit={handleSubmit}
             className="shrink-0 border-t border-[var(--border-subtle)] bg-[var(--bg-elevated)] px-4 py-4 sm:px-6"
           >
-            <div className="relative mx-auto max-w-2xl rounded-2xl border border-[var(--border-default)] bg-[var(--bg-secondary)] p-4 pb-14">
+            <div className="relative mx-auto max-w-2xl rounded-xl border border-[var(--border-default)] bg-[var(--bg-secondary)] p-4 pb-14">
               <label htmlFor="agent-prompt-thread" className="sr-only">
                 Continue the conversation
               </label>

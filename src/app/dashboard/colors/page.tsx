@@ -6,6 +6,12 @@ import { useBrandStore } from "@/stores/brand";
 import { Badge } from "@/components/ui/badge";
 import { CopyButton } from "@/components/ui/copy-button";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  HoverCard,
+  HoverCardContent,
+  HoverCardTrigger,
+} from "@/components/ui/hover-card";
 import { cn } from "@/lib/utils";
 import type { BrandColor, ColorGroup } from "@/lib/brand/types";
 
@@ -117,10 +123,24 @@ function ColorRow({
   return (
     <div className="flex gap-6 items-center border-b border-[var(--border-subtle)] py-4">
       {/* Swatch */}
-      <div
-        className="w-[72px] h-[72px] rounded-2xl border border-[var(--border-default)] shrink-0"
-        style={{ backgroundColor: displayHex }}
-      />
+      <HoverCard openDelay={200}>
+        <HoverCardTrigger asChild>
+          <button
+            type="button"
+            className="w-[72px] h-[72px] rounded-xl border border-[var(--border-default)] shrink-0 cursor-zoom-in transition-transform hover:scale-[1.02] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            style={{ backgroundColor: displayHex }}
+            aria-label={`Preview ${color.name}`}
+          />
+        </HoverCardTrigger>
+        <HoverCardContent className="w-72 space-y-2">
+          <p className="text-h3 font-heading text-foreground">{color.name}</p>
+          <p className="text-mono text-[12px] text-muted-foreground break-all">{color.cssVariable}</p>
+          <div className="flex flex-wrap gap-2 text-[12px] text-muted-foreground">
+            <span className="rounded-md bg-muted px-2 py-0.5 font-mono text-foreground">{displayHex}</span>
+            <span className="rounded-md bg-muted px-2 py-0.5 font-mono">{color.rgb}</span>
+          </div>
+        </HoverCardContent>
+      </HoverCard>
 
       {/* Middle */}
       <div className="flex-1 min-w-0">
@@ -430,36 +450,41 @@ export default function ColorsPage() {
         </div>
       </div>
 
-      {/* Color groups */}
-      <div className="mt-10">
-        {GROUP_ORDER.map((group) => {
-          const items = grouped[group];
-          if (items.length === 0) return null;
-          return (
-            <div key={group} className="mb-12">
-              <h2 className="text-h2 text-[var(--text-primary)] mb-2">
-                {GROUP_LABELS[group]}
-                <span
-                  className="ml-2 text-[var(--text-tertiary)]"
-                  style={{ fontFamily: "var(--font-geist-mono)", fontSize: 14 }}
-                >
-                  {items.length}
-                </span>
-              </h2>
-              {items.map((color) => (
-                <ColorRow
-                  key={color.cssVariable}
-                  color={color}
-                  darkMode={darkMode}
-                />
-              ))}
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Contrast matrix */}
-      <ContrastMatrix colors={profile.colors} />
+      <Tabs defaultValue="tokens" className="mt-10">
+        <TabsList variant="pill" className="mb-6 w-full max-w-md justify-start">
+          <TabsTrigger value="tokens">Color tokens</TabsTrigger>
+          <TabsTrigger value="matrix">Contrast matrix</TabsTrigger>
+        </TabsList>
+        <TabsContent value="tokens" className="mt-0">
+          {GROUP_ORDER.map((group) => {
+            const items = grouped[group];
+            if (items.length === 0) return null;
+            return (
+              <div key={group} className="mb-12">
+                <h2 className="text-h2 text-[var(--text-primary)] mb-2">
+                  {GROUP_LABELS[group]}
+                  <span
+                    className="ml-2 text-[var(--text-tertiary)]"
+                    style={{ fontFamily: "var(--font-geist-mono)", fontSize: 14 }}
+                  >
+                    {items.length}
+                  </span>
+                </h2>
+                {items.map((color) => (
+                  <ColorRow
+                    key={color.cssVariable}
+                    color={color}
+                    darkMode={darkMode}
+                  />
+                ))}
+              </div>
+            );
+          })}
+        </TabsContent>
+        <TabsContent value="matrix" className="mt-0">
+          <ContrastMatrix colors={profile.colors} />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

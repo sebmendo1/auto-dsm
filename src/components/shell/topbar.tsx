@@ -39,7 +39,7 @@ export function TopBar() {
   }
 
   return (
-    <div className="flex items-center justify-between h-14 px-6 border-b border-[var(--border-subtle)] shrink-0">
+    <div className="flex h-14 shrink-0 items-center justify-between border-b border-transparent bg-[var(--bg-secondary)]/40 px-6 backdrop-blur-[2px]">
       <div className="flex min-w-0 items-center">
         <span className="truncate text-body-s font-medium text-[var(--text-primary)]">{title}</span>
       </div>
@@ -49,7 +49,7 @@ export function TopBar() {
             href={profile.repo.url}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-[8px] text-[13px] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors"
+            className="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-md text-[13px] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors"
           >
             <Github size={14} strokeWidth={1.5} />
             <span>View on GitHub</span>

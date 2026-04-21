@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { ProductIcon } from "@/components/brand/product-mark";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Card } from "@/components/ui/card";
 import { normalizeRepoInput } from "@/lib/utils";
 import { toast } from "sonner";
 import { ArrowRight, Github, Loader2 } from "lucide-react";
@@ -75,7 +76,7 @@ export default function OnboardingPage() {
 
   return (
     <div className="min-h-screen grid place-items-center bg-[var(--bg-primary)] px-6">
-      <div className="w-full max-w-[460px] rounded-xl border border-[var(--border-default)] bg-[var(--bg-elevated)] p-10">
+      <Card className="w-full max-w-[460px] p-10">
         <ProductIcon size={28} priority />
         <h2 className="mt-6 text-h2 text-[var(--text-primary)]">Connect a repository</h2>
         <p className="mt-2 text-body-s text-[var(--text-secondary)]">
@@ -85,7 +86,7 @@ export default function OnboardingPage() {
         </p>
 
         {provider === "github" && (
-          <div className="mt-4 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-3 py-2.5">
+          <div className="mt-4 rounded-lg border-0 bg-[var(--bg-secondary)] px-3 py-2.5 shadow-[var(--shadow-sm)]">
             <div className="flex items-center justify-between gap-2 text-[12px] text-[var(--text-tertiary)]">
               <span>Your GitHub repositories</span>
               {reposLoading ? (
@@ -161,7 +162,7 @@ export default function OnboardingPage() {
             </p>
           </div>
         )}
-      </div>
+      </Card>
     </div>
   );
 }

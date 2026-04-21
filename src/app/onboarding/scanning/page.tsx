@@ -3,6 +3,7 @@
 import * as React from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ProductIcon } from "@/components/brand/product-mark";
+import { Progress } from "@/components/ui/progress";
 
 const STEPS = [
   "Fetching repository…",
@@ -85,7 +86,7 @@ function ScanningPageInner() {
 
   return (
     <div className="min-h-screen grid place-items-center bg-[var(--bg-primary)] px-6">
-      <div className="w-full max-w-[520px] rounded-xl border border-[var(--border-default)] bg-[var(--bg-elevated)] p-10">
+      <div className="w-full max-w-[520px] rounded-2xl border-0 bg-[var(--bg-elevated)] p-10 shadow-[var(--shadow-md)]">
         <ProductIcon
           size={32}
           className="autodsm-pulse"
@@ -111,11 +112,19 @@ function ScanningPageInner() {
         </div>
 
         {error ? (
-          <div className="mt-6 rounded-[8px] border border-[color-mix(in_srgb,var(--error)_30%,transparent)] bg-[color-mix(in_srgb,var(--error)_8%,transparent)] p-3 text-[13px] text-[var(--error)]">
+          <div className="mt-6 rounded-lg border-0 bg-[color-mix(in_srgb,var(--error)_12%,transparent)] p-3 text-[13px] text-[var(--error)] shadow-[var(--shadow-sm)]">
             {error}
           </div>
         ) : (
-          <div className="mt-6 h-1 rounded-full bg-[var(--bg-tertiary)] overflow-hidden relative autodsm-indeterminate" />
+          <div className="mt-6 space-y-2">
+            <Progress
+              value={Math.min(100, Math.round((log.length / Math.max(STEPS.length, 1)) * 100))}
+              className="h-1.5 overflow-hidden rounded-full bg-[var(--bg-tertiary)]"
+            />
+            <p className="text-[11px] text-[var(--text-tertiary)]">
+              Step {Math.min(log.length, STEPS.length)} of {STEPS.length}
+            </p>
+          </div>
         )}
       </div>
     </div>

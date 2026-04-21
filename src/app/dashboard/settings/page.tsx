@@ -6,6 +6,17 @@ import { useBrandStore } from "@/stores/brand";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { CopyButton } from "@/components/ui/copy-button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 // ── card wrapper ──────────────────────────────────────────────────────────────
 
@@ -19,7 +30,7 @@ function SettingsCard({
   children: React.ReactNode;
 }) {
   return (
-    <div className="bg-[var(--bg-elevated)] rounded-xl border border-[var(--border-default)] p-6">
+    <div className="bg-[var(--bg-elevated)] rounded-xl border-0 p-6 shadow-[var(--shadow-md)]">
       <div className="mb-4">
         <h3 className="text-h3 text-[var(--text-primary)]">{title}</h3>
         {description && (
@@ -154,9 +165,26 @@ export default function SettingsPage() {
             <Button variant="outline" size="sm">
               Change repo
             </Button>
-            <Button variant="danger" size="sm">
-              Disconnect
-            </Button>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="danger" size="sm" type="button">
+                  Disconnect
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Disconnect repository?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This stops syncing tokens from {owner && repoName ? `${owner}/${repoName}` : "your repo"}.
+                    You can reconnect a repository later from onboarding.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction variant="danger">Disconnect</AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </div>
         </SettingsCard>
 
@@ -201,7 +229,7 @@ export default function SettingsPage() {
           </div>
 
           {publicVisible && (
-            <div className="flex items-center gap-2 bg-[var(--bg-secondary)] rounded-lg px-3 py-2 border border-[var(--border-subtle)]">
+            <div className="flex items-center gap-2 rounded-lg border-0 bg-[var(--bg-secondary)] px-3 py-2 shadow-[var(--shadow-sm)]">
               <span
                 className="flex-1 text-[var(--text-secondary)] truncate"
                 style={{ fontFamily: "var(--font-geist-mono)", fontSize: 12 }}
@@ -225,7 +253,7 @@ export default function SettingsPage() {
                 <button
                   key={t}
                   onClick={() => setTheme(t)}
-                  className="flex items-center gap-2 px-4 py-2 rounded-[8px] border text-body-s font-medium transition-all duration-150"
+                  className="flex items-center gap-2 rounded-lg border border-[var(--border-default)] px-4 py-2 text-body-s font-medium transition-all duration-150"
                   style={{
                     borderColor: active
                       ? "var(--accent)"
