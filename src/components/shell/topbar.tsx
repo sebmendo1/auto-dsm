@@ -22,7 +22,7 @@ function titleFromPath(pathname: string, repoSlug: string | null): {
   return { repo: repoSlug ?? "—", section };
 }
 
-export function TopBar() {
+export function TopBar({ isPreview = false }: { isPreview?: boolean } = {}) {
   const pathname = usePathname();
   const { repoSlug, profile } = useBrandStore();
   const { repo, section } = titleFromPath(pathname, repoSlug);
@@ -30,6 +30,18 @@ export function TopBar() {
   return (
     <div className="flex items-center justify-between h-14 px-6 border-b border-[var(--border-subtle)]">
       <div className="flex items-center gap-2 min-w-0">
+        {isPreview ? (
+          <span
+            className="inline-flex items-center gap-1.5 h-6 px-2 rounded-full border border-[var(--border-subtle)] bg-[var(--bg-tertiary)] text-[11px] font-medium tracking-[0.02em] text-[var(--text-secondary)]"
+            title="Preview mode — using demo data"
+          >
+            <span
+              aria-hidden="true"
+              className="h-1.5 w-1.5 rounded-full bg-[var(--brand-primary)]"
+            />
+            Preview
+          </span>
+        ) : null}
         <span className="text-body-s text-[var(--text-secondary)] truncate">
           {repo}
         </span>
