@@ -1,9 +1,14 @@
 "use client";
 
 import * as React from "react";
-import { MonitorSmartphone, Smartphone, Tablet, Monitor } from "lucide-react";
+import {
+  MonitorSmartphone,
+  Smartphone,
+  Tablet,
+  Monitor,
+  Laptop,
+} from "lucide-react";
 import { useBrandStore } from "@/stores/brand";
-import { CopyButton } from "@/components/ui/copy-button";
 import { EmptyState } from "@/components/ui/empty-state";
 import {
   BrandTokenPageHero,
@@ -11,17 +16,21 @@ import {
   LastUpdatedLabel,
   TokenPageProvenanceLine,
 } from "@/components/dashboard/brand-token-page-layout";
+import { SectionHeading } from "@/components/dashboard/section-heading";
+import { TokenPagePillTabs } from "@/components/dashboard/token-page-pill-tabs";
+import { TokenRow, TokenRowGroup } from "@/components/dashboard/token-row";
 import { brandTokenSurface } from "@/components/ui/brand-card-tokens";
 import { cn } from "@/lib/utils";
 
 function deviceForPx(px: number) {
-  if (px < 640) return { icon: Smartphone, label: "Mobile" };
-  if (px < 1024) return { icon: Tablet, label: "Tablet" };
-  return { icon: Monitor, label: "Desktop" };
+  if (px < 640) return { Icon: Smartphone, label: "Mobile" };
+  if (px < 1024) return { Icon: Tablet, label: "Tablet" };
+  if (px < 1440) return { Icon: Laptop, label: "Laptop" };
+  return { Icon: Monitor, label: "Desktop" };
 }
 
 const HERO_DESC =
-  "Responsive breakpoints used across your UI. Values are scaled against the largest width—use them as single sources of truth for media queries and Tailwind.";
+  "Responsive breakpoints used across your UI. Bars scale against the largest width so you can compare at a glance.";
 
 export default function BreakpointsPage() {
   const profile = useBrandStore((s) => s.profile);
@@ -32,7 +41,7 @@ export default function BreakpointsPage() {
         hero={
           <BrandTokenPageHero
             title="Breakpoints"
-            description="Responsive breakpoints used across your UI."
+            description={HERO_DESC}
             icon={
               <MonitorSmartphone
                 size={20}
@@ -54,11 +63,8 @@ export default function BreakpointsPage() {
   }
 
   const sorted = [...profile.breakpoints].sort((a, b) => a.px - b.px);
-  const maxPx = sorted[sorted.length - 1]?.px ?? 1536;
-  const source =
-    profile.meta.tailwindConfigPath ||
-    profile.meta.cssSource ||
-    "repo";
+  const maxPx = Math.max(...sorted.map((b) => b.px), 1);
+  const source = profile.meta.tailwindConfigPath || profile.meta.cssSource || "repo";
 
   return (
     <BrandTokenPageLayout
@@ -79,75 +85,94 @@ export default function BreakpointsPage() {
       metaRight={<LastUpdatedLabel scannedAt={profile.scannedAt} />}
     >
       <div className="space-y-6">
-        <TokenPageProvenanceLine>Auto-extracted from {source}</TokenPageProvenanceLine>
+        <TokenPageProvenanceLine>
+          Auto-extracted from {source} · {sorted.length} tokens
+        </TokenPageProvenanceLine>
 
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        {sorted.map((bp) => {
-          const Device = deviceForPx(bp.px);
-          const widthPct = (bp.px / maxPx) * 100;
-          const mediaQuery = `@media (min-width: ${bp.value})`;
-          return (
-            <div
-              key={bp.name}
-              className={cn(brandTokenSurface, "p-5")}
-            >
-              <div className="flex items-center gap-4">
-                <div className="flex items-center gap-2 w-32 shrink-0">
-                  <Device.icon size={16} strokeWidth={1.5} className="text-[var(--text-secondary)]" />
-                  <div>
-                    <div
-                      className="text-[var(--text-primary)] font-medium"
-                      style={{ fontFamily: "var(--font-geist-sans)", fontSize: 14 }}
-                    >
-                      {bp.name}
-                    </div>
-                    <div
-                      className="text-[var(--text-tertiary)]"
-                      style={{ fontFamily: "var(--font-geist-mono)", fontSize: 11 }}
-                    >
-                      {Device.label}
-                    </div>
+        <TokenPagePillTabs
+          defaultValue="ruler"
+          tabs={[
+            {
+              value: "ruler",
+              label: "Ruler",
+              content: (
+                <section>
+                  <SectionHeading description="Each bar is proportional to the raw pixel width — useful for sanity-checking the media-query ladder.">
+                    Ruler
+                  </SectionHeading>
+                  <div className={cn(brandTokenSurface, "space-y-3 px-4 py-5")}>
+                    {sorted.map((b) => {
+                      const { Icon, label } = deviceForPx(b.px);
+                      const width = `${(b.px / maxPx) * 100}%`;
+                      return (
+                        <div key={b.name} className="flex items-center gap-3">
+                          <div className="flex w-20 shrink-0 items-center gap-1.5 text-[12px] text-[var(--text-tertiary)]">
+                            <Icon size={14} strokeWidth={1.5} />
+                            <span>{label}</span>
+                          </div>
+                          <div className="relative h-8 flex-1 overflow-hidden rounded-[6px] bg-[var(--bg-secondary)]">
+                            <div
+                              className="h-full rounded-[6px] bg-[var(--accent)]/80"
+                              style={{ width }}
+                            />
+                            <span
+                              className="absolute inset-y-0 right-2 flex items-center text-[11px] font-medium text-[var(--text-primary)]"
+                              style={{ fontFamily: "var(--font-geist-mono)" }}
+                            >
+                              {b.px}px
+                            </span>
+                          </div>
+                          <div
+                            className="w-12 shrink-0 text-right text-[12px] font-medium text-[var(--text-primary)]"
+                            style={{ fontFamily: "var(--font-geist-mono)" }}
+                          >
+                            {b.name}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
-                </div>
-
-                <div className="flex-1 min-w-0">
-                  <div className="h-3 rounded-full bg-[var(--bg-primary)] overflow-hidden">
-                    <div
-                      className="h-full bg-[var(--accent)] rounded-full"
-                      style={{ width: `${widthPct}%` }}
-                    />
-                  </div>
-                </div>
-
-                <div className="w-28 shrink-0 text-right">
-                  <div
-                    className="text-[var(--text-primary)]"
-                    style={{ fontFamily: "var(--font-geist-mono)", fontSize: 14 }}
-                  >
-                    {bp.px}px
-                  </div>
-                  <div
-                    className="text-[var(--text-tertiary)]"
-                    style={{ fontFamily: "var(--font-geist-mono)", fontSize: 11 }}
-                  >
-                    {bp.value}
-                  </div>
-                </div>
-              </div>
-
-              <div className="mt-3 flex items-center gap-1">
-                <span
-                  className="text-[var(--text-tertiary)] break-all flex-1"
-                  style={{ fontFamily: "var(--font-geist-mono)", fontSize: 12 }}
-                >
-                  {mediaQuery}
-                </span>
-                <CopyButton value={mediaQuery} />
-              </div>
-            </div>
-          );
-        })}
-        </div>
+                </section>
+              ),
+            },
+            {
+              value: "tokens",
+              label: "All tokens",
+              content: (
+                <section>
+                  <SectionHeading description="Each row copies the full media-query string so you can drop it straight into your CSS.">
+                    All breakpoints
+                  </SectionHeading>
+                  <TokenRowGroup>
+                    {sorted.map((b) => {
+                      const { Icon, label } = deviceForPx(b.px);
+                      return (
+                        <TokenRow
+                          key={b.name}
+                          preview={
+                            <div className="flex h-10 w-10 items-center justify-center rounded-[6px] bg-[var(--bg-secondary)] text-[var(--text-secondary)]">
+                              <Icon size={16} strokeWidth={1.5} />
+                            </div>
+                          }
+                          name={`${b.name} · ${label}`}
+                          subtitle={`min-width: ${b.value}`}
+                          meta={
+                            <div className="space-y-0.5 text-[var(--text-primary)]">
+                              <div>{b.value}</div>
+                              <div className="text-[var(--text-tertiary)]">{b.px}px</div>
+                            </div>
+                          }
+                          copyValue={`@media (min-width: ${b.value}) {}`}
+                          copyLabel={`min-width: ${b.value}`}
+                        />
+                      );
+                    })}
+                  </TokenRowGroup>
+                </section>
+              ),
+            },
+          ]}
+        />
       </div>
     </BrandTokenPageLayout>
   );
