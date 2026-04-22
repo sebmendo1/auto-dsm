@@ -1,10 +1,10 @@
 "use client";
 
 import * as React from "react";
-import { Sparkles } from "lucide-react";
 import { useBrandStore } from "@/stores/brand";
-import { CopyButton } from "@/components/ui/copy-button";
 import { EmptyState } from "@/components/ui/empty-state";
+import { PageHeader, SectionHeading } from "@/components/dashboard/page-header";
+import { TokenCard } from "@/components/dashboard/token-card";
 
 const CHECKERBOARD = `repeating-conic-gradient(
   var(--border-subtle) 0% 25%,
@@ -17,10 +17,10 @@ export default function OpacityPage() {
   if (!profile || profile.opacity.length === 0) {
     return (
       <div className="px-10 py-10 max-w-[1200px]">
-        <h1 className="text-h1 text-[var(--text-primary)]">Opacity</h1>
-        <p className="mt-2 text-body-s text-[var(--text-secondary)] max-w-[640px]">
-          Opacity scale values from your theme.
-        </p>
+        <PageHeader
+          title="Opacity"
+          description="Opacity scale values from your theme."
+        />
         <div className="mt-10">
           <EmptyState
             title="No opacity tokens detected"
@@ -36,65 +36,50 @@ export default function OpacityPage() {
 
   return (
     <div className="px-10 py-10 max-w-[1200px]">
-      <h1 className="text-h1 text-[var(--text-primary)]">Opacity</h1>
-      <p className="mt-2 text-body-s text-[var(--text-secondary)] max-w-[640px]">
-        Opacity scale used across your UI. Previews on a checkerboard to reveal transparency.
-      </p>
-      <div className="mt-4 flex items-center gap-1.5">
-        <Sparkles size={14} strokeWidth={1.5} className="text-[var(--text-tertiary)]" />
-        <span
-          className="text-[var(--text-tertiary)]"
-          style={{ fontFamily: "var(--font-geist-sans)", fontSize: 12 }}
-        >
-          Auto-extracted from {source}
-        </span>
-      </div>
+      <PageHeader
+        title="Opacity"
+        description="Opacity scale used across your UI. Previews render on a checkerboard to reveal transparency at a glance."
+        source={source}
+        count={sorted.length}
+      />
 
-      <div className="mt-10 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-        {sorted.map((op) => {
-          const className = `opacity-${op.name}`;
-          return (
-            <div
-              key={op.name}
-              className="rounded-xl border border-[var(--border-default)] bg-[var(--bg-elevated)] overflow-hidden"
-            >
-              <div
-                className="h-24 relative"
-                style={{ background: CHECKERBOARD }}
-              >
-                <div
-                  className="absolute inset-0 bg-[var(--accent)]"
-                  style={{ opacity: op.value }}
-                />
-              </div>
-              <div className="p-3">
-                <div className="flex items-baseline justify-between gap-2">
+      <div className="mt-12">
+        <SectionHeading count={sorted.length}>Opacity Tokens</SectionHeading>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          {sorted.map((op) => {
+            const className = `opacity-${op.name}`;
+            return (
+              <TokenCard
+                key={op.name}
+                previewHeight={120}
+                previewBackground={CHECKERBOARD}
+                previewPadding="p-0"
+                preview={
                   <div
-                    className="text-[var(--text-primary)] font-medium"
-                    style={{ fontFamily: "var(--font-geist-sans)", fontSize: 13 }}
-                  >
-                    {op.name}
-                  </div>
-                  <div
-                    className="text-[var(--text-tertiary)]"
-                    style={{ fontFamily: "var(--font-geist-mono)", fontSize: 11 }}
-                  >
-                    {op.percentage}
-                  </div>
-                </div>
-                <div className="mt-2 flex items-center gap-1">
-                  <span
-                    className="text-[var(--text-tertiary)] flex-1 truncate"
-                    style={{ fontFamily: "var(--font-geist-mono)", fontSize: 11 }}
-                  >
-                    {className}
-                  </span>
-                  <CopyButton value={className} iconSize={12} />
-                </div>
-              </div>
-            </div>
-          );
-        })}
+                    className="absolute inset-0 bg-[var(--accent)]"
+                    style={{ opacity: op.value }}
+                  />
+                }
+                title={op.name}
+                subtitle={
+                  <>
+                    {op.percentage} · {op.isCustom ? "custom · " : ""}
+                    {op.source}
+                  </>
+                }
+                specs={[
+                  { label: "VALUE", value: op.value },
+                  { label: "PERCENT", value: op.percentage },
+                ]}
+                copyables={[
+                  { eyebrow: "VALUE", label: "value", value: String(op.value) },
+                  { eyebrow: "CLASS", label: "tailwind class", value: className },
+                ]}
+              />
+            );
+          })}
+        </div>
       </div>
     </div>
   );

@@ -1,10 +1,10 @@
 "use client";
 
 import * as React from "react";
-import { Sparkles } from "lucide-react";
 import { useBrandStore } from "@/stores/brand";
-import { CopyButton } from "@/components/ui/copy-button";
 import { EmptyState } from "@/components/ui/empty-state";
+import { PageHeader, SectionHeading, Eyebrow } from "@/components/dashboard/page-header";
+import { TokenRow } from "@/components/dashboard/token-row";
 
 export default function ZIndexPage() {
   const profile = useBrandStore((s) => s.profile);
@@ -12,10 +12,10 @@ export default function ZIndexPage() {
   if (!profile || profile.zIndex.length === 0) {
     return (
       <div className="px-10 py-10 max-w-[1200px]">
-        <h1 className="text-h1 text-[var(--text-primary)]">Z-Index</h1>
-        <p className="mt-2 text-body-s text-[var(--text-secondary)] max-w-[640px]">
-          Stacking order tokens in your UI.
-        </p>
+        <PageHeader
+          title="Z-Index"
+          description="Stacking order tokens in your UI."
+        />
         <div className="mt-10">
           <EmptyState
             title="No z-index tokens detected"
@@ -31,45 +31,50 @@ export default function ZIndexPage() {
 
   return (
     <div className="px-10 py-10 max-w-[1200px]">
-      <h1 className="text-h1 text-[var(--text-primary)]">Z-Index</h1>
-      <p className="mt-2 text-body-s text-[var(--text-secondary)] max-w-[640px]">
-        Stacking order scale visualized as layered planes. Higher values stack on top.
-      </p>
-      <div className="mt-4 flex items-center gap-1.5">
-        <Sparkles size={14} strokeWidth={1.5} className="text-[var(--text-tertiary)]" />
-        <span
-          className="text-[var(--text-tertiary)]"
-          style={{ fontFamily: "var(--font-geist-sans)", fontSize: 12 }}
-        >
-          Auto-extracted from {source}
-        </span>
-      </div>
+      <PageHeader
+        title="Z-Index"
+        description="Stacking order scale visualized as layered planes. Higher values stack on top."
+        source={source}
+        count={sorted.length}
+      />
 
-      <div className="mt-10 grid grid-cols-1 lg:grid-cols-[360px_1fr] gap-8">
-        {/* Stacking diagram */}
-        <div className="rounded-xl border border-[var(--border-default)] bg-[var(--bg-elevated)] p-6">
-          <div
-            className="text-[var(--text-tertiary)] mb-4"
-            style={{ fontFamily: "var(--font-geist-mono)", fontSize: 10 }}
-          >
-            STACKING PREVIEW
-          </div>
-          <div className="relative h-[280px] flex items-end justify-center">
+      {/* Section 1: Stacking viz */}
+      <div className="mt-12">
+        <SectionHeading>Stacking Order</SectionHeading>
+
+        <div className="rounded-xl border border-[var(--border-default)] bg-[var(--bg-elevated)] p-8">
+          <Eyebrow>PREVIEW</Eyebrow>
+          <div className="mt-4 relative h-[280px] flex items-center justify-center">
             {sorted.map((z, i) => {
-              const offset = i * 14;
+              const offset = i * 16;
               return (
                 <div
                   key={z.name}
-                  className="absolute w-48 h-32 rounded-lg border border-[var(--border-default)] bg-[var(--bg-primary)] flex items-center justify-center"
+                  className="absolute w-[200px] h-[120px] rounded-lg border border-[var(--border-default)] bg-[var(--bg-secondary)] flex items-center justify-between px-4"
                   style={{
-                    bottom: `${offset}px`,
-                    right: `${offset + 40}px`,
-                    boxShadow: "0 4px 12px rgba(0,0,0,0.4)",
+                    top: `calc(50% - 60px + ${offset}px)`,
+                    left: `calc(50% - 100px - ${offset}px)`,
+                    boxShadow:
+                      "0 10px 24px -8px rgba(0,0,0,0.35), 0 2px 6px -2px rgba(0,0,0,0.25)",
+                    zIndex: i + 1,
                   }}
                 >
                   <span
-                    className="text-[var(--text-secondary)]"
-                    style={{ fontFamily: "var(--font-geist-mono)", fontSize: 11 }}
+                    className="text-[var(--text-primary)]"
+                    style={{
+                      fontFamily: "var(--font-geist-sans)",
+                      fontSize: 12,
+                      fontWeight: 500,
+                    }}
+                  >
+                    {z.name}
+                  </span>
+                  <span
+                    className="text-[var(--accent)]"
+                    style={{
+                      fontFamily: "var(--font-geist-mono)",
+                      fontSize: 12,
+                    }}
                   >
                     z-{z.value}
                   </span>
@@ -78,53 +83,44 @@ export default function ZIndexPage() {
             })}
           </div>
         </div>
+      </div>
 
-        {/* Table */}
-        <div className="space-y-0">
-          {sorted.map((z) => {
-            const cls = `z-${z.name}`;
-            return (
-              <div
-                key={z.name}
-                className="flex items-center gap-4 py-4 border-b border-[var(--border-subtle)]"
-              >
-                <div className="w-10 text-right shrink-0">
+      {/* Section 2: Tokens */}
+      <div className="mt-14">
+        <SectionHeading count={sorted.length}>Tokens</SectionHeading>
+
+        {sorted.map((z) => {
+          const cls = `z-${z.name}`;
+          return (
+            <TokenRow
+              key={z.name}
+              previewWidth={56}
+              preview={
+                <div
+                  className="w-11 h-11 rounded-md bg-[var(--accent-subtle)] border border-[var(--border-default)] flex items-center justify-center"
+                >
                   <span
                     className="text-[var(--accent)]"
-                    style={{ fontFamily: "var(--font-geist-mono)", fontSize: 14 }}
+                    style={{
+                      fontFamily: "var(--font-geist-mono)",
+                      fontSize: 12,
+                      fontWeight: 500,
+                    }}
                   >
                     {z.value}
                   </span>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <div
-                    className="text-[var(--text-primary)] font-medium"
-                    style={{ fontFamily: "var(--font-geist-sans)", fontSize: 14 }}
-                  >
-                    {z.name}
-                  </div>
-                  {z.inferredRole && (
-                    <div
-                      className="text-[var(--text-tertiary)]"
-                      style={{ fontFamily: "var(--font-geist-sans)", fontSize: 12 }}
-                    >
-                      {z.inferredRole}
-                    </div>
-                  )}
-                </div>
-                <div className="flex items-center gap-1">
-                  <span
-                    className="text-[var(--text-tertiary)]"
-                    style={{ fontFamily: "var(--font-geist-mono)", fontSize: 12 }}
-                  >
-                    {cls}
-                  </span>
-                  <CopyButton value={cls} iconSize={12} />
-                </div>
-              </div>
-            );
-          })}
-        </div>
+              }
+              name={z.name}
+              meta={z.inferredRole ?? "—"}
+              submeta={z.isCustom ? `custom · ${z.source}` : z.source}
+              copyables={[
+                { eyebrow: "Z", label: "value", value: String(z.value) },
+                { eyebrow: "CLASS", label: "tailwind class", value: cls },
+              ]}
+            />
+          );
+        })}
       </div>
     </div>
   );

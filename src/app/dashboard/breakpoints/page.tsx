@@ -1,10 +1,11 @@
 "use client";
 
 import * as React from "react";
-import { Sparkles, Smartphone, Tablet, Monitor } from "lucide-react";
+import { Smartphone, Tablet, Monitor } from "lucide-react";
 import { useBrandStore } from "@/stores/brand";
-import { CopyButton } from "@/components/ui/copy-button";
 import { EmptyState } from "@/components/ui/empty-state";
+import { PageHeader, SectionHeading, Eyebrow } from "@/components/dashboard/page-header";
+import { TokenRow } from "@/components/dashboard/token-row";
 
 function deviceForPx(px: number) {
   if (px < 640) return { icon: Smartphone, label: "Mobile" };
@@ -18,10 +19,10 @@ export default function BreakpointsPage() {
   if (!profile || profile.breakpoints.length === 0) {
     return (
       <div className="px-10 py-10 max-w-[1200px]">
-        <h1 className="text-h1 text-[var(--text-primary)]">Breakpoints</h1>
-        <p className="mt-2 text-body-s text-[var(--text-secondary)] max-w-[640px]">
-          Responsive breakpoints used across your UI.
-        </p>
+        <PageHeader
+          title="Breakpoints"
+          description="Responsive breakpoints used across your UI."
+        />
         <div className="mt-10">
           <EmptyState
             title="No breakpoints detected"
@@ -41,84 +42,92 @@ export default function BreakpointsPage() {
 
   return (
     <div className="px-10 py-10 max-w-[1200px]">
-      <h1 className="text-h1 text-[var(--text-primary)]">Breakpoints</h1>
-      <p className="mt-2 text-body-s text-[var(--text-secondary)] max-w-[640px]">
-        Responsive breakpoints scaled against the largest. Use these media query thresholds in CSS and Tailwind.
-      </p>
-      <div className="mt-4 flex items-center gap-1.5">
-        <Sparkles size={14} strokeWidth={1.5} className="text-[var(--text-tertiary)]" />
-        <span
-          className="text-[var(--text-tertiary)]"
-          style={{ fontFamily: "var(--font-geist-sans)", fontSize: 12 }}
-        >
-          Auto-extracted from {source}
-        </span>
+      <PageHeader
+        title="Breakpoints"
+        description="Responsive breakpoints scaled against the largest. Use these media query thresholds in CSS and Tailwind."
+        source={source}
+        count={sorted.length}
+      />
+
+      {/* Section 1: Ruler */}
+      <div className="mt-12">
+        <SectionHeading>Breakpoint Ruler</SectionHeading>
+        <div className="rounded-xl border border-[var(--border-default)] bg-[var(--bg-elevated)] p-6">
+          <Eyebrow>SCALE · 0 → {maxPx}px</Eyebrow>
+          <div className="mt-5 relative h-12">
+            <div className="absolute inset-x-0 top-5 h-1.5 rounded-full bg-[var(--bg-tertiary)]" />
+            {sorted.map((bp) => {
+              const leftPct = (bp.px / maxPx) * 100;
+              return (
+                <div
+                  key={bp.name}
+                  className="absolute -translate-x-1/2"
+                  style={{ left: `${leftPct}%`, top: 0 }}
+                >
+                  <div className="w-[2px] h-3 bg-[var(--accent)] mx-auto" />
+                  <div className="w-2.5 h-2.5 rounded-full bg-[var(--accent)] mx-auto -mt-[1px]" />
+                  <div
+                    className="mt-2 text-center text-[var(--text-secondary)]"
+                    style={{
+                      fontFamily: "var(--font-geist-mono)",
+                      fontSize: 10,
+                    }}
+                  >
+                    {bp.name}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
       </div>
 
-      <div className="mt-10 space-y-3">
+      {/* Section 2: Token rows */}
+      <div className="mt-14">
+        <SectionHeading count={sorted.length}>Tokens</SectionHeading>
         {sorted.map((bp) => {
           const Device = deviceForPx(bp.px);
           const widthPct = (bp.px / maxPx) * 100;
           const mediaQuery = `@media (min-width: ${bp.value})`;
           return (
-            <div
+            <TokenRow
               key={bp.name}
-              className="rounded-xl border border-[var(--border-default)] bg-[var(--bg-elevated)] p-5"
-            >
-              <div className="flex items-center gap-4">
-                <div className="flex items-center gap-2 w-32 shrink-0">
-                  <Device.icon size={16} strokeWidth={1.5} className="text-[var(--text-secondary)]" />
-                  <div>
-                    <div
-                      className="text-[var(--text-primary)] font-medium"
-                      style={{ fontFamily: "var(--font-geist-sans)", fontSize: 14 }}
-                    >
-                      {bp.name}
-                    </div>
-                    <div
+              previewWidth={180}
+              preview={
+                <div className="flex flex-col gap-2 w-full">
+                  <div className="flex items-center gap-2">
+                    <Device.icon
+                      size={14}
+                      strokeWidth={1.5}
                       className="text-[var(--text-tertiary)]"
-                      style={{ fontFamily: "var(--font-geist-mono)", fontSize: 11 }}
+                    />
+                    <span
+                      className="text-[var(--text-tertiary)]"
+                      style={{
+                        fontFamily: "var(--font-geist-mono)",
+                        fontSize: 11,
+                      }}
                     >
                       {Device.label}
-                    </div>
+                    </span>
                   </div>
-                </div>
-
-                <div className="flex-1 min-w-0">
-                  <div className="h-3 rounded-full bg-[var(--bg-primary)] overflow-hidden">
+                  <div className="h-1.5 w-full rounded-full bg-[var(--bg-tertiary)] overflow-hidden">
                     <div
                       className="h-full bg-[var(--accent)] rounded-full"
                       style={{ width: `${widthPct}%` }}
                     />
                   </div>
                 </div>
-
-                <div className="w-28 shrink-0 text-right">
-                  <div
-                    className="text-[var(--text-primary)]"
-                    style={{ fontFamily: "var(--font-geist-mono)", fontSize: 14 }}
-                  >
-                    {bp.px}px
-                  </div>
-                  <div
-                    className="text-[var(--text-tertiary)]"
-                    style={{ fontFamily: "var(--font-geist-mono)", fontSize: 11 }}
-                  >
-                    {bp.value}
-                  </div>
-                </div>
-              </div>
-
-              <div className="mt-3 flex items-center gap-1">
-                <span
-                  className="text-[var(--text-tertiary)] break-all flex-1"
-                  style={{ fontFamily: "var(--font-geist-mono)", fontSize: 12 }}
-                >
-                  {mediaQuery}
-                </span>
-                <CopyButton value={mediaQuery} />
-              </div>
-            </div>
+              }
+              name={bp.name}
+              meta={`${bp.px}px · ${bp.value}`}
+              submeta={bp.isCustom ? `custom · ${bp.source}` : bp.source}
+              copyables={[
+                { eyebrow: "PX", label: "pixels", value: `${bp.px}px` },
+                { eyebrow: "CSS", label: "value", value: bp.value },
+                { eyebrow: "MEDIA", label: "media query", value: mediaQuery },
+              ]}
+            />
           );
         })}
       </div>

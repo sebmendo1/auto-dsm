@@ -1,10 +1,10 @@
 "use client";
 
 import * as React from "react";
-import { Sparkles } from "lucide-react";
 import { useBrandStore } from "@/stores/brand";
 import { EmptyState } from "@/components/ui/empty-state";
-import { CopyButton } from "@/components/ui/copy-button";
+import { PageHeader, SectionHeading, Eyebrow } from "@/components/dashboard/page-header";
+import { TokenRow } from "@/components/dashboard/token-row";
 
 export default function RadiiPage() {
   const profile = useBrandStore((s) => s.profile);
@@ -12,10 +12,10 @@ export default function RadiiPage() {
   if (!profile || profile.radii.length === 0) {
     return (
       <div className="px-10 py-10 max-w-[1200px]">
-        <h1 className="text-h1 text-[var(--text-primary)]">Radii</h1>
-        <p className="mt-2 text-body-s text-[var(--text-secondary)] max-w-[640px]">
-          Border-radius tokens for rounded corners.
-        </p>
+        <PageHeader
+          title="Radii"
+          description="Border-radius tokens for rounded corners."
+        />
         <div className="mt-10">
           <EmptyState
             title="No radii detected"
@@ -35,240 +35,151 @@ export default function RadiiPage() {
 
   return (
     <div className="px-10 py-10 max-w-[1200px]">
-      <h1 className="text-h1 text-[var(--text-primary)]">Radii</h1>
-      <p className="mt-2 text-body-s text-[var(--text-secondary)] max-w-[640px]">
-        Border-radius tokens for rounded corners.
-      </p>
-      <div className="mt-4 flex items-center gap-1.5">
-        <Sparkles
-          size={14}
-          strokeWidth={1.5}
-          className="text-[var(--text-tertiary)]"
-        />
-        <span
-          className="text-[var(--text-tertiary)]"
-          style={{ fontFamily: "var(--font-geist-sans)", fontSize: 12 }}
-        >
-          Auto-extracted from {source}
-        </span>
-      </div>
+      <PageHeader
+        title="Radii"
+        description="Border-radius tokens for rounded corners. Previewed against common UI elements so you can see how each value feels in context."
+        source={source}
+        count={sorted.length}
+      />
 
-      {/* ── Section 1: Progression ── */}
-      <div className="mt-10">
-        <h2 className="text-h2 text-[var(--text-primary)] mb-6">
-          Radius Progression
-        </h2>
-        <div className="flex flex-wrap gap-8 items-end">
-          {sorted.map((radius) => (
-            <div key={radius.name} className="flex flex-col items-center gap-2">
+      {/* Section 1: Progression */}
+      <div className="mt-12">
+        <SectionHeading count={sorted.length}>Radius Progression</SectionHeading>
+        <div className="rounded-xl border border-[var(--border-default)] bg-[var(--bg-elevated)] p-8">
+          <div className="flex flex-wrap gap-10 items-end">
+            {sorted.map((radius) => (
               <div
-                className="w-16 h-16"
-                style={{
-                  borderRadius: radius.value,
-                  backgroundColor: "var(--accent-subtle)",
-                  border: "1px solid var(--border-default)",
-                }}
-              />
-              <div
-                className="text-[var(--text-secondary)] text-center"
-                style={{ fontFamily: "var(--font-geist-mono)", fontSize: 11 }}
+                key={radius.name}
+                className="flex flex-col items-center gap-3"
               >
-                <div className="text-[var(--text-primary)] font-medium">
-                  {radius.name}
-                </div>
-                <div>{radius.value}</div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* ── Section 2: Applied Examples matrix ── */}
-      <div className="mt-14">
-        <h2 className="text-h2 text-[var(--text-primary)] mb-6">
-          Applied Examples
-        </h2>
-        <div className="overflow-x-auto">
-          <table className="border-collapse">
-            <thead>
-              <tr>
-                <th className="w-[100px] h-[40px] border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-3 text-left">
-                  <span
+                <div
+                  className="w-16 h-16 border border-[var(--border-default)]"
+                  style={{
+                    borderRadius: radius.value,
+                    backgroundColor: "var(--accent-subtle)",
+                  }}
+                />
+                <div className="text-center">
+                  <div
+                    className="text-[var(--text-primary)]"
+                    style={{
+                      fontFamily: "var(--font-geist-sans)",
+                      fontSize: 12,
+                      fontWeight: 500,
+                    }}
+                  >
+                    {radius.name}
+                  </div>
+                  <div
                     className="text-[var(--text-tertiary)]"
                     style={{
                       fontFamily: "var(--font-geist-mono)",
                       fontSize: 11,
                     }}
                   >
-                    Component
-                  </span>
-                </th>
-                {sorted.map((r) => (
-                  <th
-                    key={r.name}
-                    className="w-[140px] h-[40px] border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-3 text-center"
-                  >
-                    <span
-                      className="text-[var(--text-secondary)]"
-                      style={{
-                        fontFamily: "var(--font-geist-mono)",
-                        fontSize: 11,
-                      }}
-                    >
-                      {r.name}
-                    </span>
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {/* Button row */}
-              <tr>
-                <td className="border border-[var(--border-subtle)] px-3 py-2">
-                  <span
-                    className="text-[var(--text-tertiary)]"
-                    style={{
-                      fontFamily: "var(--font-geist-sans)",
-                      fontSize: 12,
-                    }}
-                  >
-                    Button
-                  </span>
-                </td>
-                {sorted.map((r) => (
-                  <td
-                    key={r.name}
-                    className="border border-[var(--border-subtle)] px-3 py-3 text-center"
-                  >
-                    <button
-                      className="h-10 px-4 bg-[var(--accent)] text-white text-[13px] font-medium w-full"
-                      style={{ borderRadius: r.value }}
-                    >
-                      Button
-                    </button>
-                  </td>
-                ))}
-              </tr>
-
-              {/* Input row */}
-              <tr>
-                <td className="border border-[var(--border-subtle)] px-3 py-2">
-                  <span
-                    className="text-[var(--text-tertiary)]"
-                    style={{
-                      fontFamily: "var(--font-geist-sans)",
-                      fontSize: 12,
-                    }}
-                  >
-                    Input
-                  </span>
-                </td>
-                {sorted.map((r) => (
-                  <td
-                    key={r.name}
-                    className="border border-[var(--border-subtle)] px-3 py-3 text-center"
-                  >
-                    <input
-                      className="h-10 w-full px-3 bg-[var(--bg-tertiary)] border border-[var(--border-default)] text-[13px] text-[var(--text-secondary)] placeholder:text-[var(--text-placeholder)]"
-                      style={{ borderRadius: r.value }}
-                      placeholder="Input"
-                      readOnly
-                    />
-                  </td>
-                ))}
-              </tr>
-
-              {/* Card row */}
-              <tr>
-                <td className="border border-[var(--border-subtle)] px-3 py-2">
-                  <span
-                    className="text-[var(--text-tertiary)]"
-                    style={{
-                      fontFamily: "var(--font-geist-sans)",
-                      fontSize: 12,
-                    }}
-                  >
-                    Card
-                  </span>
-                </td>
-                {sorted.map((r) => (
-                  <td
-                    key={r.name}
-                    className="border border-[var(--border-subtle)] px-3 py-3 text-center"
-                  >
-                    <div
-                      className="h-20 w-full bg-[var(--bg-tertiary)] border border-[var(--border-default)] flex items-center justify-center"
-                      style={{ borderRadius: r.value }}
-                    >
-                      <span
-                        className="text-[var(--text-tertiary)]"
-                        style={{
-                          fontFamily: "var(--font-geist-sans)",
-                          fontSize: 12,
-                        }}
-                      >
-                        Card
-                      </span>
-                    </div>
-                  </td>
-                ))}
-              </tr>
-            </tbody>
-          </table>
+                    {radius.value}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 
-      {/* ── Section 3: Detail rows ── */}
+      {/* Section 2: Applied examples — 2-col grid */}
       <div className="mt-14">
-        <h2 className="text-h2 text-[var(--text-primary)] mb-4">
-          Token Details
-        </h2>
-        {sorted.map((radius) => (
-          <div
-            key={radius.name}
-            className="flex items-center gap-6 py-4 border-b border-[var(--border-subtle)]"
-          >
-            {/* Preview */}
+        <SectionHeading>Applied Examples</SectionHeading>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {sorted.map((r) => (
             <div
-              className="w-12 h-12 shrink-0 bg-[var(--accent-subtle)] border border-[var(--border-default)]"
-              style={{ borderRadius: radius.value }}
-            />
-
-            {/* Info */}
-            <div className="flex-1 min-w-0">
-              <div
-                className="text-[var(--text-primary)] font-medium"
-                style={{ fontFamily: "var(--font-geist-sans)", fontSize: 14 }}
-              >
-                {radius.name}
+              key={r.name}
+              className="rounded-xl border border-[var(--border-default)] bg-[var(--bg-elevated)] p-5"
+            >
+              <div className="flex items-baseline justify-between">
+                <div
+                  className="text-[var(--text-primary)] font-medium"
+                  style={{
+                    fontFamily: "var(--font-geist-sans)",
+                    fontSize: 14,
+                  }}
+                >
+                  {r.name}
+                </div>
+                <Eyebrow>{r.tailwindClass}</Eyebrow>
+              </div>
+              <div className="mt-4 flex items-stretch gap-3">
+                <button
+                  className="h-9 px-3 bg-[var(--accent)] text-[var(--accent-fg)] text-[13px] font-medium shrink-0"
+                  style={{
+                    borderRadius: r.value,
+                    fontFamily: "var(--font-geist-sans)",
+                  }}
+                >
+                  Button
+                </button>
+                <input
+                  readOnly
+                  placeholder="Input"
+                  className="flex-1 min-w-0 h-9 px-3 bg-[var(--bg-secondary)] border border-[var(--border-default)] text-[13px] text-[var(--text-secondary)] placeholder:text-[var(--text-placeholder)] outline-none"
+                  style={{
+                    borderRadius: r.value,
+                    fontFamily: "var(--font-geist-sans)",
+                  }}
+                />
+                <div
+                  className="w-9 h-9 bg-[var(--bg-secondary)] border border-[var(--border-default)] shrink-0"
+                  style={{ borderRadius: r.value }}
+                />
               </div>
               <div
-                className="text-[var(--text-tertiary)]"
-                style={{ fontFamily: "var(--font-geist-mono)", fontSize: 12 }}
+                className="mt-3 text-[var(--text-tertiary)]"
+                style={{ fontFamily: "var(--font-geist-mono)", fontSize: 11 }}
               >
-                {radius.tailwindClass}
+                {r.value} · {r.px}px
               </div>
             </div>
+          ))}
+        </div>
+      </div>
 
-            {/* Values */}
-            <div className="flex items-center gap-3">
-              <div className="text-right">
-                <div
-                  className="text-[var(--text-primary)]"
-                  style={{ fontFamily: "var(--font-geist-mono)", fontSize: 13 }}
-                >
-                  {radius.value}
-                </div>
-                <div
-                  className="text-[var(--text-tertiary)]"
-                  style={{ fontFamily: "var(--font-geist-mono)", fontSize: 12 }}
-                >
-                  {radius.px}px
-                </div>
-              </div>
-              <CopyButton value={radius.value} />
-            </div>
-          </div>
+      {/* Section 3: Detail rows */}
+      <div className="mt-14">
+        <SectionHeading>Token Details</SectionHeading>
+        {sorted.map((radius) => (
+          <TokenRow
+            key={radius.name}
+            previewWidth={56}
+            preview={
+              <div
+                className="w-12 h-12 border border-[var(--border-default)]"
+                style={{
+                  borderRadius: radius.value,
+                  backgroundColor: "var(--accent-subtle)",
+                }}
+              />
+            }
+            name={radius.name}
+            meta={radius.tailwindClass}
+            submeta={radius.isCustom ? `custom · ${radius.source}` : radius.source}
+            copyables={[
+              { eyebrow: "PX", label: "pixels", value: `${radius.px}px` },
+              { eyebrow: "CSS", label: "value", value: radius.value },
+              {
+                eyebrow: "CLASS",
+                label: "tailwind class",
+                value: radius.tailwindClass,
+              },
+              ...(radius.cssVariable
+                ? [
+                    {
+                      eyebrow: "VAR",
+                      label: "css variable",
+                      value: radius.cssVariable,
+                    },
+                  ]
+                : []),
+            ]}
+          />
         ))}
       </div>
     </div>
