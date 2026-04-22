@@ -1,10 +1,18 @@
 "use client";
 
 import * as React from "react";
-import { Sparkles, Image as ImageIcon } from "lucide-react";
+import { Image as ImageIcon, Images } from "lucide-react";
 import { useBrandStore } from "@/stores/brand";
 import { CopyButton } from "@/components/ui/copy-button";
 import { EmptyState } from "@/components/ui/empty-state";
+import {
+  BrandTokenPageHero,
+  BrandTokenPageLayout,
+  LastUpdatedLabel,
+  TokenPageProvenanceLine,
+} from "@/components/dashboard/brand-token-page-layout";
+import { brandTokenSurface } from "@/components/ui/brand-card-tokens";
+import { cn } from "@/lib/utils";
 import type { BrandAsset } from "@/lib/brand/types";
 
 const CATEGORY_ORDER: BrandAsset["category"][] = [
@@ -23,11 +31,14 @@ const CATEGORY_LABELS: Record<BrandAsset["category"], string> = {
   image: "Images",
 };
 
+const HERO_DESC =
+  "Logos, icons, illustrations, and raster assets discovered across your repository.";
+
 function AssetPreview({ asset }: { asset: BrandAsset }) {
   if (asset.type === "svg" && asset.content) {
     return (
       <div
-        className="w-full h-full flex items-center justify-center p-4"
+        className="flex h-full w-full items-center justify-center p-4"
         dangerouslySetInnerHTML={{ __html: asset.content }}
       />
     );
@@ -38,7 +49,7 @@ function AssetPreview({ asset }: { asset: BrandAsset }) {
       <img
         src={asset.storageUrl}
         alt={asset.name}
-        className="max-w-full max-h-full object-contain"
+        className="max-h-full max-w-full object-contain"
       />
     );
   }
@@ -56,18 +67,21 @@ export default function AssetsPage() {
 
   if (!profile || profile.assets.length === 0) {
     return (
-      <div className="px-10 py-10 max-w-[1200px]">
-        <h1 className="text-h1 text-[var(--text-primary)]">Assets</h1>
-        <p className="mt-2 text-body-s text-[var(--text-secondary)] max-w-[640px]">
-          Logos, icons, and images from your repo.
-        </p>
-        <div className="mt-10">
-          <EmptyState
-            title="No assets found"
-            description="We didn't find any SVGs, PNGs, or images in this repo's public or assets folders."
+      <BrandTokenPageLayout
+        hero={
+          <BrandTokenPageHero
+            title="Assets"
+            description={HERO_DESC}
+            icon={<Images size={20} strokeWidth={1.75} className="shrink-0" aria-hidden />}
           />
-        </div>
-      </div>
+        }
+        metaRight={profile?.scannedAt ? <LastUpdatedLabel scannedAt={profile.scannedAt} /> : undefined}
+      >
+        <EmptyState
+          title="No assets found"
+          description="We didn't find any SVGs, PNGs, or images in this repo's public or assets folders."
+        />
+      </BrandTokenPageLayout>
     );
   }
 
@@ -79,84 +93,85 @@ export default function AssetsPage() {
   }
 
   return (
-    <div className="px-10 py-10 max-w-[1200px]">
-      <h1 className="text-h1 text-[var(--text-primary)]">Assets</h1>
-      <p className="mt-2 text-body-s text-[var(--text-secondary)] max-w-[640px]">
-        Logos, icons, illustrations, and raster assets discovered across your repo.
-      </p>
-      <div className="mt-4 flex items-center gap-1.5">
-        <Sparkles size={14} strokeWidth={1.5} className="text-[var(--text-tertiary)]" />
-        <span
-          className="text-[var(--text-tertiary)]"
-          style={{ fontFamily: "var(--font-geist-sans)", fontSize: 12 }}
-        >
+    <BrandTokenPageLayout
+      hero={
+        <BrandTokenPageHero
+          title="Assets"
+          description={HERO_DESC}
+          icon={<Images size={20} strokeWidth={1.75} className="shrink-0" aria-hidden />}
+        />
+      }
+      metaRight={<LastUpdatedLabel scannedAt={profile.scannedAt} />}
+    >
+      <div className="space-y-6">
+        <TokenPageProvenanceLine>
           {profile.assets.length} assets · scanned from {profile.meta.filesScanned} files
-        </span>
-      </div>
+        </TokenPageProvenanceLine>
 
-      <div className="mt-10 space-y-12">
-        {CATEGORY_ORDER.filter((c) => byCategory.has(c)).map((cat) => {
-          const items = byCategory.get(cat) ?? [];
-          return (
-            <section key={cat}>
-              <div className="flex items-baseline justify-between mb-4">
-                <h2 className="text-h3 text-[var(--text-primary)]">
-                  {CATEGORY_LABELS[cat]}
-                </h2>
-                <span
-                  className="text-[var(--text-tertiary)]"
-                  style={{ fontFamily: "var(--font-geist-mono)", fontSize: 11 }}
-                >
-                  {items.length}
-                </span>
-              </div>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                {items.map((asset) => (
-                  <div
-                    key={asset.path}
-                    className="rounded-xl border border-[var(--border-default)] bg-[var(--bg-elevated)] overflow-hidden"
+        <div className="space-y-12">
+          {CATEGORY_ORDER.filter((c) => byCategory.has(c)).map((cat) => {
+            const items = byCategory.get(cat) ?? [];
+            return (
+              <section key={cat}>
+                <div className="mb-4 flex items-baseline justify-between">
+                  <h2 className="text-h3 text-[var(--text-primary)]">
+                    {CATEGORY_LABELS[cat]}
+                  </h2>
+                  <span
+                    className="text-[var(--text-tertiary)]"
+                    style={{ fontFamily: "var(--font-geist-mono)", fontSize: 11 }}
                   >
-                    <div className="h-36 bg-[var(--bg-primary)] flex items-center justify-center">
-                      <AssetPreview asset={asset} />
-                    </div>
-                    <div className="p-3">
-                      <div
-                        className="text-[var(--text-primary)] truncate"
-                        style={{ fontFamily: "var(--font-geist-sans)", fontSize: 13 }}
-                        title={asset.name}
-                      >
-                        {asset.name}
+                    {items.length}
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  {items.map((asset) => (
+                    <div
+                      key={asset.path}
+                      className={cn(brandTokenSurface, "overflow-hidden")}
+                    >
+                      <div className="flex h-36 items-center justify-center bg-[var(--bg-primary)]">
+                        <AssetPreview asset={asset} />
                       </div>
-                      <div
-                        className="text-[var(--text-tertiary)] mt-0.5 flex items-center gap-2"
-                        style={{ fontFamily: "var(--font-geist-mono)", fontSize: 11 }}
-                      >
-                        <span className="uppercase">{asset.type}</span>
-                        {asset.dimensions && (
-                          <span>
-                            {asset.dimensions.width}×{asset.dimensions.height}
-                          </span>
-                        )}
-                        <span>{asset.fileSizeFormatted}</span>
-                      </div>
-                      <div className="mt-2 flex items-center gap-1">
-                        <span
-                          className="text-[var(--text-tertiary)] flex-1 truncate"
-                          style={{ fontFamily: "var(--font-geist-mono)", fontSize: 11 }}
-                          title={asset.path}
+                      <div className="p-3">
+                        <div
+                          className="truncate text-[var(--text-primary)]"
+                          style={{ fontFamily: "var(--font-geist-sans)", fontSize: 13 }}
+                          title={asset.name}
                         >
-                          {asset.path}
-                        </span>
-                        <CopyButton value={asset.path} iconSize={12} />
+                          {asset.name}
+                        </div>
+                        <div
+                          className="mt-0.5 flex items-center gap-2 text-[var(--text-tertiary)]"
+                          style={{ fontFamily: "var(--font-geist-mono)", fontSize: 11 }}
+                        >
+                          <span className="uppercase">{asset.type}</span>
+                          {asset.dimensions && (
+                            <span>
+                              {asset.dimensions.width}×{asset.dimensions.height}
+                            </span>
+                          )}
+                          <span>{asset.fileSizeFormatted}</span>
+                        </div>
+                        <div className="mt-2 flex items-center gap-1">
+                          <span
+                            className="flex-1 truncate text-[var(--text-tertiary)]"
+                            style={{ fontFamily: "var(--font-geist-mono)", fontSize: 11 }}
+                            title={asset.path}
+                          >
+                            {asset.path}
+                          </span>
+                          <CopyButton value={asset.path} iconSize={12} />
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-            </section>
-          );
-        })}
+                  ))}
+                </div>
+              </section>
+            );
+          })}
+        </div>
       </div>
-    </div>
+    </BrandTokenPageLayout>
   );
 }

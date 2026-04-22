@@ -1,17 +1,46 @@
 "use client";
 
 import * as React from "react";
-import { ArrowUp } from "lucide-react";
+import { ArrowUp, Plus, Square } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import PromptInput, {
+  PromptInputAction,
+  PromptInputActionGroup,
+  PromptInputActions,
+  PromptInputTextarea,
+} from "@/components/nexus-ui/prompt-input";
+import {
+  Message,
+  MessageContent,
+  MessageMarkdown,
+  MessageStack,
+  MessageActions,
+} from "@/components/nexus-ui/message";
+import { Thread, ThreadContent, ThreadScrollToBottom } from "@/components/nexus-ui/thread";
+import {
+  Citation,
+  CitationContent,
+  CitationItem,
+  CitationTrigger,
+  type CitationSourceInput,
+} from "@/components/nexus-ui/citation";
 
 export default function AgentPage() {
   const [input, setInput] = React.useState("");
   const [messages, setMessages] = React.useState<
-    { id: string; role: "user" | "assistant"; text: string }[]
+    {
+      id: string;
+      role: "user" | "assistant";
+      text: string;
+      citations?: CitationSourceInput[];
+    }[]
   >([]);
 
-  function submitPrompt() {
-    const text = input.trim();
+  const isLoading = false;
+
+  function submitPrompt(value?: string) {
+    const text = (value ?? input).trim();
     if (!text) return;
     setMessages((m) => [
       ...m,
@@ -21,6 +50,26 @@ export default function AgentPage() {
         role: "assistant",
         text:
           "Design system answers will appear here once this route is connected to your AI backend. For now, keep exploring tokens in the sidebar.",
+        citations: [
+          {
+            url: "https://nexus-ui.dev/docs/components/thread",
+            title: "Thread | Nexus UI",
+            description:
+              "A viewport for stacked Message turns that sticks to the bottom as content grows.",
+          },
+          {
+            url: "https://nexus-ui.dev/docs/components/message",
+            title: "Message | Nexus UI",
+            description:
+              "Composable user + assistant chat turns (Message, MessageContent, MessageMarkdown, and more).",
+          },
+          {
+            url: "https://nexus-ui.dev/docs/components/citation",
+            title: "Citation | Nexus UI",
+            description:
+              "Inline source chip with hover preview for one or more citations.",
+          },
+        ],
       },
     ]);
     setInput("");
@@ -52,100 +101,145 @@ export default function AgentPage() {
             onSubmit={handleSubmit}
             className="mt-9 w-full max-w-[560px] sm:mt-10"
           >
-            <div className="relative flex min-h-[140px] flex-col rounded-xl bg-[var(--bg-secondary)] p-4 pb-12 shadow-[var(--shadow-sm)]">
-              <label htmlFor="agent-prompt" className="sr-only">
-                Ask about your design system or brand
-              </label>
-              <textarea
-                id="agent-prompt"
+            <PromptInput
+              onSubmit={(value) => submitPrompt(value)}
+              className="min-h-[140px]"
+            >
+              <PromptInputTextarea
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 placeholder="Ask any questions about your design system or brand"
-                className={cn(
-                  "min-h-0 w-full flex-1 resize-none border-0 bg-transparent text-sm leading-relaxed text-[var(--text-primary)]",
-                  "placeholder:text-[var(--text-tertiary)] focus:outline-none",
-                )}
+                disabled={isLoading}
                 style={{ fontFamily: "var(--font-geist-sans)" }}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    submitPrompt();
-                  }
-                }}
+                className="min-h-[92px]"
               />
-              <button
-                type="submit"
-                className={cn(
-                  "absolute bottom-3 right-3 inline-flex h-10 w-10 items-center justify-center rounded-full",
-                  "bg-[var(--accent)] text-[var(--accent-fg)] shadow-md",
-                  "transition-opacity hover:opacity-90 active:scale-[0.97] disabled:pointer-events-none disabled:opacity-35",
-                )}
-                disabled={!input.trim()}
-                aria-label="Send"
-              >
-                <ArrowUp size={18} strokeWidth={2.25} />
-              </button>
-            </div>
+              <PromptInputActions>
+                <PromptInputActionGroup>
+                  <PromptInputAction asChild>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      className={cn(
+                        "rounded-full",
+                        "text-[var(--text-tertiary)] hover:text-[var(--text-primary)]",
+                        "hover:bg-[var(--bg-secondary)] active:bg-[var(--bg-secondary)]",
+                        "dark:hover:bg-[var(--bg-tertiary)] dark:active:bg-[var(--bg-elevated)]",
+                        "disabled:opacity-60",
+                      )}
+                      aria-label="Attach"
+                      disabled
+                    >
+                      <Plus className="size-4" />
+                    </Button>
+                  </PromptInputAction>
+                </PromptInputActionGroup>
+
+                <PromptInputActionGroup>
+                  <PromptInputAction asChild>
+                    <Button
+                      type="submit"
+                      size="icon-sm"
+                      className={cn(
+                        "rounded-full border-0 disabled:opacity-60",
+                        "bg-zinc-200 text-zinc-900 shadow-none",
+                        "hover:bg-zinc-300",
+                        "focus-visible:ring-2 focus-visible:ring-zinc-400/50",
+                        "focus-visible:[box-shadow:none!important] dark:focus-visible:ring-zinc-500/40",
+                      )}
+                      disabled={isLoading || !input.trim()}
+                      aria-label="Send"
+                    >
+                      {isLoading ? (
+                        <Square className="size-3.5 fill-current" />
+                      ) : (
+                        <ArrowUp className="size-4" />
+                      )}
+                    </Button>
+                  </PromptInputAction>
+                </PromptInputActionGroup>
+              </PromptInputActions>
+            </PromptInput>
           </form>
         </div>
       ) : (
         <>
-          <div className="min-h-0 flex-1 overflow-y-auto px-5 py-6 sm:px-8">
-            <ul className="mx-auto flex max-w-2xl flex-col gap-4">
-              {messages.map((msg) => (
-                <li
-                  key={msg.id}
-                  className={cn(
-                    "rounded-xl px-4 py-3 text-body-s leading-relaxed",
-                    msg.role === "user"
-                      ? "ml-6 bg-[var(--bg-tertiary)] text-[var(--text-primary)] sm:ml-8"
-                      : "mr-6 border border-[var(--border-subtle)] bg-[var(--bg-secondary)] text-[var(--text-secondary)] sm:mr-8",
-                  )}
-                >
-                  {msg.text}
-                </li>
-              ))}
-            </ul>
+          <div className="min-h-0 flex-1 overflow-hidden px-5 py-4 sm:px-8">
+            <div className="mx-auto h-full max-w-2xl">
+              <Thread className="h-full">
+                <ThreadContent className="items-stretch">
+                  {messages.map((msg) => (
+                    <Message
+                      key={msg.id}
+                      from={msg.role === "user" ? "user" : "assistant"}
+                    >
+                      <MessageStack>
+                        <MessageContent>
+                          <MessageMarkdown>{msg.text}</MessageMarkdown>
+                        </MessageContent>
+
+                        {msg.citations?.length ? (
+                          <MessageActions className="pt-0.5">
+                            <Citation citations={msg.citations}>
+                              <CitationTrigger className="cursor-pointer" />
+                              <CitationContent>
+                                <CitationItem />
+                              </CitationContent>
+                            </Citation>
+                          </MessageActions>
+                        ) : null}
+                      </MessageStack>
+                    </Message>
+                  ))}
+                </ThreadContent>
+                <ThreadScrollToBottom />
+              </Thread>
+            </div>
           </div>
 
           <form
             onSubmit={handleSubmit}
-            className="shrink-0 border-t border-[var(--border-subtle)] bg-[var(--bg-elevated)] px-4 py-4 sm:px-6"
+            className="shrink-0 border-t border-[var(--border-subtle)] px-4 py-4 sm:px-6"
           >
-            <div className="relative mx-auto max-w-2xl rounded-xl border border-[var(--border-default)] bg-[var(--bg-secondary)] p-4 pb-14">
-              <label htmlFor="agent-prompt-thread" className="sr-only">
-                Continue the conversation
-              </label>
-              <textarea
-                id="agent-prompt-thread"
-                rows={3}
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                placeholder="Ask any questions about your design system or brand"
-                className={cn(
-                  "w-full resize-none border-0 bg-transparent text-[15px] leading-relaxed text-[var(--text-primary)]",
-                  "placeholder:text-[var(--text-tertiary)] focus:outline-none",
-                )}
-                style={{ fontFamily: "var(--font-geist-sans)" }}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    submitPrompt();
-                  }
-                }}
-              />
-              <button
-                type="submit"
-                className={cn(
-                  "absolute bottom-3 right-3 inline-flex h-10 w-10 items-center justify-center rounded-full",
-                  "bg-[var(--accent)] text-[var(--accent-fg)] shadow-md",
-                  "transition-opacity hover:opacity-90 active:scale-[0.97] disabled:pointer-events-none disabled:opacity-35",
-                )}
-                disabled={!input.trim()}
-                aria-label="Send"
+            <div className="mx-auto max-w-2xl">
+              <PromptInput
+                onSubmit={(value) => submitPrompt(value)}
+                className="min-h-[112px]"
               >
-                <ArrowUp size={18} strokeWidth={2.25} />
-              </button>
+                <PromptInputTextarea
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  placeholder="Ask any questions about your design system or brand"
+                  disabled={isLoading}
+                  style={{ fontFamily: "var(--font-geist-sans)" }}
+                />
+                <PromptInputActions>
+                  <PromptInputActionGroup />
+                  <PromptInputActionGroup>
+                    <PromptInputAction asChild>
+                      <Button
+                        type="submit"
+                        size="icon-sm"
+                        className={cn(
+                          "rounded-full border-0 disabled:opacity-60",
+                          "bg-zinc-200 text-zinc-900 shadow-none",
+                          "hover:bg-zinc-300",
+                          "focus-visible:ring-2 focus-visible:ring-zinc-400/50",
+                          "focus-visible:[box-shadow:none!important] dark:focus-visible:ring-zinc-500/40",
+                        )}
+                        disabled={isLoading || !input.trim()}
+                        aria-label="Send"
+                      >
+                        {isLoading ? (
+                          <Square className="size-3.5 fill-current" />
+                        ) : (
+                          <ArrowUp className="size-4" />
+                        )}
+                      </Button>
+                    </PromptInputAction>
+                  </PromptInputActionGroup>
+                </PromptInputActions>
+              </PromptInput>
             </div>
           </form>
         </>

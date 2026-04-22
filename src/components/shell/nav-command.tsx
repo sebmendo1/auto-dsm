@@ -52,7 +52,7 @@ export function NavCommand({ className }: { className?: string }) {
         variant="outline"
         size="sm"
         className={cn(
-          "hidden h-8 gap-2 border-0 bg-[var(--bg-tertiary)] px-2.5 text-[12px] text-[var(--text-secondary)] md:inline-flex",
+          "hidden h-8 w-full gap-2 border-0 bg-[var(--bg-tertiary)] px-2.5 text-[12px] text-[var(--text-secondary)] md:inline-flex",
           className,
         )}
         onClick={() => setOpen(true)}

@@ -1,28 +1,44 @@
 "use client";
 
 import * as React from "react";
-import { Sparkles } from "lucide-react";
+import { Layers2 } from "lucide-react";
 import { useBrandStore } from "@/stores/brand";
 import { CopyButton } from "@/components/ui/copy-button";
 import { EmptyState } from "@/components/ui/empty-state";
+import {
+  BrandTokenPageHero,
+  BrandTokenPageLayout,
+  LastUpdatedLabel,
+  TokenPageProvenanceLine,
+} from "@/components/dashboard/brand-token-page-layout";
+import { brandTokenSurface } from "@/components/ui/brand-card-tokens";
+import { cn } from "@/lib/utils";
+
+const HERO_DESC =
+  "Elevation tokens for cards, modals, and focus rings—extracted from your repository.";
 
 export default function ShadowsPage() {
   const profile = useBrandStore((s) => s.profile);
 
   if (!profile || profile.shadows.length === 0) {
     return (
-      <div className="px-10 py-10 max-w-[1200px]">
-        <h1 className="text-h1 text-[var(--text-primary)]">Shadows</h1>
-        <p className="mt-2 text-body-s text-[var(--text-secondary)] max-w-[640px]">
-          Elevation tokens for cards, modals, and focus rings.
-        </p>
-        <div className="mt-10">
-          <EmptyState
-            title="No shadows detected"
-            description="We didn't find any shadow tokens in this repo's source files."
+      <BrandTokenPageLayout
+        hero={
+          <BrandTokenPageHero
+            title="Shadows"
+            description={HERO_DESC}
+            icon={
+              <Layers2 size={20} strokeWidth={1.75} className="shrink-0" aria-hidden />
+            }
           />
-        </div>
-      </div>
+        }
+        metaRight={profile?.scannedAt ? <LastUpdatedLabel scannedAt={profile.scannedAt} /> : undefined}
+      >
+        <EmptyState
+          title="No shadows detected"
+          description="We didn't find any shadow tokens in this repo's source files."
+        />
+      </BrandTokenPageLayout>
     );
   }
 
@@ -32,27 +48,22 @@ export default function ShadowsPage() {
     "repo";
 
   return (
-    <div className="px-10 py-10 max-w-[1200px]">
-      <h1 className="text-h1 text-[var(--text-primary)]">Shadows</h1>
-      <p className="mt-2 text-body-s text-[var(--text-secondary)] max-w-[640px]">
-        Elevation tokens for cards, modals, and focus rings.
-      </p>
-      <div className="mt-4 flex items-center gap-1.5">
-        <Sparkles
-          size={14}
-          strokeWidth={1.5}
-          className="text-[var(--text-tertiary)]"
+    <BrandTokenPageLayout
+      hero={
+        <BrandTokenPageHero
+          title="Shadows"
+          description={HERO_DESC}
+          icon={<Layers2 size={20} strokeWidth={1.75} className="shrink-0" aria-hidden />}
         />
-        <span
-          className="text-[var(--text-tertiary)]"
-          style={{ fontFamily: "var(--font-geist-sans)", fontSize: 12 }}
-        >
-          Auto-extracted from {source}
-        </span>
-      </div>
+      }
+      metaRight={<LastUpdatedLabel scannedAt={profile.scannedAt} />}
+    >
+      <div className="space-y-6">
+        <TokenPageProvenanceLine>Auto-extracted from {source}</TokenPageProvenanceLine>
 
+        <div className="space-y-10">
       {/* ── Section 1: Side-by-side progression ── */}
-      <div className="mt-10">
+      <div>
         <h2 className="text-h2 text-[var(--text-primary)] mb-6">
           Elevation Progression
         </h2>
@@ -112,7 +123,7 @@ export default function ShadowsPage() {
       </div>
 
       {/* ── Section 2: Detail rows ── */}
-      <div className="mt-8">
+      <div>
         <h2 className="text-h2 text-[var(--text-primary)] mb-6">
           Token Details
         </h2>
@@ -123,7 +134,7 @@ export default function ShadowsPage() {
           >
             {/* Preview card */}
             <div
-              className="w-24 h-24 bg-[var(--bg-elevated)] rounded-xl shrink-0"
+              className={cn(brandTokenSurface, "h-24 w-24 shrink-0")}
               style={{ boxShadow: shadow.value }}
             />
 
@@ -221,6 +232,8 @@ export default function ShadowsPage() {
           </div>
         ))}
       </div>
-    </div>
+        </div>
+      </div>
+    </BrandTokenPageLayout>
   );
 }

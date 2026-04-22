@@ -1,28 +1,42 @@
 "use client";
 
 import * as React from "react";
-import { Sparkles } from "lucide-react";
+import { Layers3 } from "lucide-react";
 import { useBrandStore } from "@/stores/brand";
 import { CopyButton } from "@/components/ui/copy-button";
 import { EmptyState } from "@/components/ui/empty-state";
+import {
+  BrandTokenPageHero,
+  BrandTokenPageLayout,
+  LastUpdatedLabel,
+  TokenPageProvenanceLine,
+} from "@/components/dashboard/brand-token-page-layout";
+import { brandTokenSurface } from "@/components/ui/brand-card-tokens";
+import { cn } from "@/lib/utils";
+
+const HERO_DESC =
+  "Stacking order scale visualized as layered planes. Higher values stack on top of lower ones.";
 
 export default function ZIndexPage() {
   const profile = useBrandStore((s) => s.profile);
 
   if (!profile || profile.zIndex.length === 0) {
     return (
-      <div className="px-10 py-10 max-w-[1200px]">
-        <h1 className="text-h1 text-[var(--text-primary)]">Z-Index</h1>
-        <p className="mt-2 text-body-s text-[var(--text-secondary)] max-w-[640px]">
-          Stacking order tokens in your UI.
-        </p>
-        <div className="mt-10">
-          <EmptyState
-            title="No z-index tokens detected"
-            description="We didn't find any z-index tokens in this repo."
+      <BrandTokenPageLayout
+        hero={
+          <BrandTokenPageHero
+            title="Z-Index"
+            description="Stacking order tokens in your UI."
+            icon={<Layers3 size={20} strokeWidth={1.75} className="shrink-0" aria-hidden />}
           />
-        </div>
-      </div>
+        }
+        metaRight={profile?.scannedAt ? <LastUpdatedLabel scannedAt={profile.scannedAt} /> : undefined}
+      >
+        <EmptyState
+          title="No z-index tokens detected"
+          description="We didn't find any z-index tokens in this repo."
+        />
+      </BrandTokenPageLayout>
     );
   }
 
@@ -30,24 +44,22 @@ export default function ZIndexPage() {
   const source = profile.meta.tailwindConfigPath || profile.meta.cssSource || "repo";
 
   return (
-    <div className="px-10 py-10 max-w-[1200px]">
-      <h1 className="text-h1 text-[var(--text-primary)]">Z-Index</h1>
-      <p className="mt-2 text-body-s text-[var(--text-secondary)] max-w-[640px]">
-        Stacking order scale visualized as layered planes. Higher values stack on top.
-      </p>
-      <div className="mt-4 flex items-center gap-1.5">
-        <Sparkles size={14} strokeWidth={1.5} className="text-[var(--text-tertiary)]" />
-        <span
-          className="text-[var(--text-tertiary)]"
-          style={{ fontFamily: "var(--font-geist-sans)", fontSize: 12 }}
-        >
-          Auto-extracted from {source}
-        </span>
-      </div>
+    <BrandTokenPageLayout
+      hero={
+        <BrandTokenPageHero
+          title="Z-Index"
+          description={HERO_DESC}
+          icon={<Layers3 size={20} strokeWidth={1.75} className="shrink-0" aria-hidden />}
+        />
+      }
+      metaRight={<LastUpdatedLabel scannedAt={profile.scannedAt} />}
+    >
+      <div className="space-y-6">
+        <TokenPageProvenanceLine>Auto-extracted from {source}</TokenPageProvenanceLine>
 
-      <div className="mt-10 grid grid-cols-1 lg:grid-cols-[360px_1fr] gap-8">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* Stacking diagram */}
-        <div className="rounded-xl border border-[var(--border-default)] bg-[var(--bg-elevated)] p-6">
+        <div className={cn(brandTokenSurface, "min-w-0 p-6")}>
           <div
             className="text-[var(--text-tertiary)] mb-4"
             style={{ fontFamily: "var(--font-geist-mono)", fontSize: 10 }}
@@ -80,13 +92,14 @@ export default function ZIndexPage() {
         </div>
 
         {/* Table */}
-        <div className="space-y-0">
+        <div className={cn(brandTokenSurface, "min-w-0 p-0")}>
+          <div className="space-y-0">
           {sorted.map((z) => {
             const cls = `z-${z.name}`;
             return (
               <div
                 key={z.name}
-                className="flex items-center gap-4 py-4 border-b border-[var(--border-subtle)]"
+                className="flex items-center gap-4 border-b border-[var(--border-subtle)] px-4 py-4"
               >
                 <div className="w-10 text-right shrink-0">
                   <span
@@ -124,8 +137,10 @@ export default function ZIndexPage() {
               </div>
             );
           })}
+          </div>
+        </div>
         </div>
       </div>
-    </div>
+    </BrandTokenPageLayout>
   );
 }

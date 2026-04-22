@@ -1,33 +1,49 @@
 "use client";
 
 import * as React from "react";
-import { Sparkles } from "lucide-react";
+import { Droplets } from "lucide-react";
 import { useBrandStore } from "@/stores/brand";
 import { CopyButton } from "@/components/ui/copy-button";
 import { EmptyState } from "@/components/ui/empty-state";
+import {
+  BrandTokenPageHero,
+  BrandTokenPageLayout,
+  LastUpdatedLabel,
+  TokenPageProvenanceLine,
+} from "@/components/dashboard/brand-token-page-layout";
+import { brandTokenSurface } from "@/components/ui/brand-card-tokens";
+import { cn } from "@/lib/utils";
 
 const CHECKERBOARD = `repeating-conic-gradient(
   var(--border-subtle) 0% 25%,
   transparent 0% 50%
 ) 50% / 12px 12px`;
 
+const HERO_DESC =
+  "Opacity scale used across your UI. Previews on a checkerboard to reveal transparency.";
+
 export default function OpacityPage() {
   const profile = useBrandStore((s) => s.profile);
 
   if (!profile || profile.opacity.length === 0) {
     return (
-      <div className="px-10 py-10 max-w-[1200px]">
-        <h1 className="text-h1 text-[var(--text-primary)]">Opacity</h1>
-        <p className="mt-2 text-body-s text-[var(--text-secondary)] max-w-[640px]">
-          Opacity scale values from your theme.
-        </p>
-        <div className="mt-10">
-          <EmptyState
-            title="No opacity tokens detected"
-            description="We didn't find any opacity values in this repo."
+      <BrandTokenPageLayout
+        hero={
+          <BrandTokenPageHero
+            title="Opacity"
+            description="Opacity scale values from your theme."
+            icon={
+              <Droplets size={20} strokeWidth={1.75} className="shrink-0" aria-hidden />
+            }
           />
-        </div>
-      </div>
+        }
+        metaRight={profile?.scannedAt ? <LastUpdatedLabel scannedAt={profile.scannedAt} /> : undefined}
+      >
+        <EmptyState
+          title="No opacity tokens detected"
+          description="We didn't find any opacity values in this repo."
+        />
+      </BrandTokenPageLayout>
     );
   }
 
@@ -35,31 +51,29 @@ export default function OpacityPage() {
   const source = profile.meta.tailwindConfigPath || profile.meta.cssSource || "repo";
 
   return (
-    <div className="px-10 py-10 max-w-[1200px]">
-      <h1 className="text-h1 text-[var(--text-primary)]">Opacity</h1>
-      <p className="mt-2 text-body-s text-[var(--text-secondary)] max-w-[640px]">
-        Opacity scale used across your UI. Previews on a checkerboard to reveal transparency.
-      </p>
-      <div className="mt-4 flex items-center gap-1.5">
-        <Sparkles size={14} strokeWidth={1.5} className="text-[var(--text-tertiary)]" />
-        <span
-          className="text-[var(--text-tertiary)]"
-          style={{ fontFamily: "var(--font-geist-sans)", fontSize: 12 }}
-        >
-          Auto-extracted from {source}
-        </span>
-      </div>
+    <BrandTokenPageLayout
+      hero={
+        <BrandTokenPageHero
+          title="Opacity"
+          description={HERO_DESC}
+          icon={<Droplets size={20} strokeWidth={1.75} className="shrink-0" aria-hidden />}
+        />
+      }
+      metaRight={<LastUpdatedLabel scannedAt={profile.scannedAt} />}
+    >
+      <div className="space-y-6">
+        <TokenPageProvenanceLine>Auto-extracted from {source}</TokenPageProvenanceLine>
 
-      <div className="mt-10 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         {sorted.map((op) => {
           const className = `opacity-${op.name}`;
           return (
             <div
               key={op.name}
-              className="rounded-xl border border-[var(--border-default)] bg-[var(--bg-elevated)] overflow-hidden"
+              className={cn(brandTokenSurface, "overflow-hidden")}
             >
               <div
-                className="h-24 relative"
+                className="relative h-24"
                 style={{ background: CHECKERBOARD }}
               >
                 <div
@@ -70,7 +84,7 @@ export default function OpacityPage() {
               <div className="p-3">
                 <div className="flex items-baseline justify-between gap-2">
                   <div
-                    className="text-[var(--text-primary)] font-medium"
+                    className="font-medium text-[var(--text-primary)]"
                     style={{ fontFamily: "var(--font-geist-sans)", fontSize: 13 }}
                   >
                     {op.name}
@@ -84,7 +98,7 @@ export default function OpacityPage() {
                 </div>
                 <div className="mt-2 flex items-center gap-1">
                   <span
-                    className="text-[var(--text-tertiary)] flex-1 truncate"
+                    className="flex-1 truncate text-[var(--text-tertiary)]"
                     style={{ fontFamily: "var(--font-geist-mono)", fontSize: 11 }}
                   >
                     {className}
@@ -95,7 +109,8 @@ export default function OpacityPage() {
             </div>
           );
         })}
+        </div>
       </div>
-    </div>
+    </BrandTokenPageLayout>
   );
 }

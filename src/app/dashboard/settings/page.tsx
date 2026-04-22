@@ -3,6 +3,8 @@
 import * as React from "react";
 import { useTheme } from "next-themes";
 import { useBrandStore } from "@/stores/brand";
+import { brandTokenSurfaceBordered } from "@/components/ui/brand-card-tokens";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { CopyButton } from "@/components/ui/copy-button";
@@ -24,17 +26,32 @@ function SettingsCard({
   title,
   description,
   children,
+  variant = "default",
 }: {
   title: string;
   description?: string;
   children: React.ReactNode;
+  variant?: "default" | "danger";
 }) {
   return (
-    <div className="bg-[var(--bg-elevated)] rounded-xl border-0 p-6 shadow-[var(--shadow-md)]">
-      <div className="mb-4">
-        <h3 className="text-h3 text-[var(--text-primary)]">{title}</h3>
+    <div
+      className={cn(
+        brandTokenSurfaceBordered,
+        "p-5 sm:p-6",
+        variant === "danger" && "border-[var(--error)]/30"
+      )}
+    >
+      <div className="mb-4 sm:mb-5">
+        <h3
+          className={cn(
+            "text-h3 text-[var(--text-primary)]",
+            variant === "danger" && "text-[var(--error)]"
+          )}
+        >
+          {title}
+        </h3>
         {description && (
-          <p className="mt-1 text-body-s text-[var(--text-secondary)]">
+          <p className="mt-1.5 text-body-s text-[var(--text-secondary)]">
             {description}
           </p>
         )}
@@ -59,13 +76,20 @@ export default function SettingsPage() {
   const initials = owner ? owner[0].toUpperCase() : "?";
 
   return (
-    <div className="px-10 py-10 max-w-[1200px]">
+    <div className="w-full min-w-0 max-w-[1280px] px-6 py-8 sm:px-10 sm:py-10">
       <h1 className="text-h1 text-[var(--text-primary)]">Settings</h1>
-      <p className="mt-2 text-body-s text-[var(--text-secondary)] max-w-[640px]">
+      <p className="mt-2 max-w-2xl text-[15px] leading-relaxed text-[var(--text-secondary)]">
         Manage your account, repository, and brand book visibility.
       </p>
+      {owner && repoName ? (
+        <p className="mt-2 flex flex-wrap items-center gap-x-1.5 text-[12px] text-[var(--text-tertiary)]">
+          <span className="font-mono text-[11px] text-[var(--text-tertiary)]">
+            {owner}/{repoName}
+          </span>
+        </p>
+      ) : null}
 
-      <div className="mt-10 space-y-6">
+      <div className="mt-8 space-y-4 sm:mt-10 sm:space-y-6">
         {/* ── 1. Account ── */}
         <SettingsCard
           title="Account"
@@ -229,7 +253,7 @@ export default function SettingsPage() {
           </div>
 
           {publicVisible && (
-            <div className="flex items-center gap-2 rounded-lg border-0 bg-[var(--bg-secondary)] px-3 py-2 shadow-[var(--shadow-sm)]">
+            <div className="flex items-center gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-canvas)] px-3 py-2 shadow-none">
               <span
                 className="flex-1 text-[var(--text-secondary)] truncate"
                 style={{ fontFamily: "var(--font-geist-mono)", fontSize: 12 }}
@@ -253,11 +277,11 @@ export default function SettingsPage() {
                 <button
                   key={t}
                   onClick={() => setTheme(t)}
-                  className="flex items-center gap-2 rounded-lg border border-[var(--border-default)] px-4 py-2 text-body-s font-medium transition-all duration-150"
+                  className="flex items-center gap-2 rounded-lg border border-[var(--border-subtle)] px-4 py-2 text-body-s font-medium transition-all duration-150 [transition-timing-function:var(--ease-standard)]"
                   style={{
                     borderColor: active
                       ? "var(--accent)"
-                      : "var(--border-default)",
+                      : "var(--border-subtle)",
                     backgroundColor: active
                       ? "var(--accent-subtle)"
                       : "var(--bg-secondary)",
@@ -299,9 +323,7 @@ export default function SettingsPage() {
         </SettingsCard>
 
         {/* ── 6. Danger Zone ── */}
-        <SettingsCard
-          title="Danger Zone"
-        >
+        <SettingsCard title="Danger Zone" variant="danger">
           <p className="text-body-s text-[var(--text-secondary)] mb-4">
             Permanently delete your account and all associated data. This
             action cannot be undone.

@@ -1,248 +1,221 @@
 "use client";
 
 import * as React from "react";
-import { Sparkles } from "lucide-react";
+import { BetweenHorizontalStart, Type, UnfoldVertical } from "lucide-react";
 import { useBrandStore } from "@/stores/brand";
-import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  BrandTokenPageHero,
+  BrandTokenPageLayout,
+  LastUpdatedLabel,
+} from "@/components/dashboard/brand-token-page-layout";
+import { TypographyBodyCard } from "@/components/ui/typography-body-card";
+import { TypographyContainerCard } from "@/components/ui/typography-container-card";
+import { brandDashboardCardRadius } from "@/components/ui/brand-card-tokens";
+import { cn } from "@/lib/utils";
+import type { BrandProfile, BrandTypography } from "@/lib/brand/types";
+import type { TypographyMetricTabsTuple } from "@/components/ui/typography-metric-pills";
 
-const DEFAULT_SAMPLE = "the fox jumped over the lazy dog";
+const BODY_LOREM =
+  "Type assets including fonts, weight, spacing, and individual styles. All tokens below reflect values extracted from your repository — use them as the single source of truth for product and marketing surfaces.";
+
+const CARD_LOREM =
+  "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation.";
+
+/** `utility` tokens map to the Caption tab (no `caption` category in BrandTypography). */
+function typographyByCategory(profile: BrandProfile) {
+  const list = profile.typography;
+  return {
+    headings: list.filter((t) => t.category === "heading" || t.category === "display"),
+    body: list.filter((t) => t.category === "body"),
+    caption: list.filter((t) => t.category === "utility"),
+  };
+}
+
+function familyLabel(fontFamily: string): string {
+  return fontFamily.split(",")[0]?.replace(/['"]/g, "").trim() || "UI Sans";
+}
+
+function tokenPreviewStyle(t: BrandTypography): React.CSSProperties {
+  return {
+    fontFamily: t.fontFamily,
+    fontSize: t.fontSize,
+    fontWeight: t.fontWeightNumeric,
+    lineHeight: t.lineHeight,
+    letterSpacing: t.letterSpacing?.trim() && t.letterSpacing !== "normal" ? t.letterSpacing : undefined,
+    textTransform:
+      t.textTransform && t.textTransform !== "none"
+        ? (t.textTransform as React.CSSProperties["textTransform"])
+        : undefined,
+  };
+}
+
+function metricTabsForToken(
+  t: BrandTypography,
+  tabIconProps: { size: number; strokeWidth: number; className: string },
+): TypographyMetricTabsTuple {
+  return [
+    {
+      icon: <Type {...tabIconProps} />,
+      label: `${t.fontSizePx}px`,
+    },
+    {
+      icon: <UnfoldVertical {...tabIconProps} />,
+      label: t.lineHeight && t.lineHeight !== "normal" ? t.lineHeight : "Auto",
+    },
+    {
+      icon: <BetweenHorizontalStart {...tabIconProps} />,
+      label:
+        t.letterSpacing?.trim() && t.letterSpacing !== "normal"
+          ? t.letterSpacing
+          : "0%",
+    },
+  ];
+}
+
+function EmptyTabStrip({ children }: { children: React.ReactNode }) {
+  return (
+    <div
+      className={cn(
+        brandDashboardCardRadius,
+        "border border-dashed border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-4 py-8 text-center text-[13px] text-[var(--text-tertiary)]",
+      )}
+    >
+      {children}
+    </div>
+  );
+}
 
 export default function TypographyPage() {
   const profile = useBrandStore((s) => s.profile);
-  const [samples, setSamples] = React.useState<Record<string, string>>({});
-  const [editing, setEditing] = React.useState<string | null>(null);
-  const [draft, setDraft] = React.useState("");
+  const tabIconProps = { size: 14, strokeWidth: 1.75, className: "shrink-0" } as const;
 
   if (!profile) {
     return (
-      <div className="px-10 py-10 max-w-[1200px]">
-        <h1 className="text-h1 text-[var(--text-primary)]">Typography</h1>
-        <div className="mt-10">
-          <EmptyState
-            title="No typography detected"
-            description="We didn't find any typography tokens in this repo's source files."
+      <BrandTokenPageLayout
+        hero={
+          <BrandTokenPageHero
+            title="Typography"
+            description="Fonts, weights, and type scale extracted from your repository."
+            icon={<Type size={20} strokeWidth={1.75} className="shrink-0" aria-hidden />}
           />
-        </div>
-      </div>
+        }
+      >
+        <EmptyState
+          title="No typography detected"
+          description="We didn't find any typography tokens in this repo's source files."
+        />
+      </BrandTokenPageLayout>
     );
   }
 
   if (profile.fonts.length === 0 && profile.typography.length === 0) {
     return (
-      <div className="px-10 py-10 max-w-[1200px]">
-        <h1 className="text-h1 text-[var(--text-primary)]">Typography</h1>
-        <p className="mt-2 text-body-s text-[var(--text-secondary)] max-w-[640px]">
-          Fonts, weights, and type scale extracted from your repository.
-        </p>
-        <div className="mt-10">
-          <EmptyState
-            title="No typography detected"
-            description="We didn't find any typography tokens in this repo's source files."
+      <BrandTokenPageLayout
+        hero={
+          <BrandTokenPageHero
+            title="Typography"
+            description="Fonts, weights, and type scale extracted from your repository."
+            icon={<Type size={20} strokeWidth={1.75} className="shrink-0" aria-hidden />}
           />
-        </div>
-      </div>
+        }
+        metaRight={<LastUpdatedLabel scannedAt={profile.scannedAt} />}
+      >
+        <EmptyState
+          title="No typography detected"
+          description="We didn't find any typography tokens in this repo's source files."
+        />
+      </BrandTokenPageLayout>
     );
   }
 
-  const source =
-    profile.meta.cssSource ||
-    profile.meta.tailwindConfigPath ||
-    "repo";
-
-  const sortedTypography = [...profile.typography].sort(
-    (a, b) => b.fontSizePx - a.fontSizePx
-  );
-
-  function startEdit(name: string) {
-    setEditing(name);
-    setDraft(samples[name] ?? DEFAULT_SAMPLE);
-  }
-
-  function commitEdit(name: string) {
-    setSamples((prev) => ({
-      ...prev,
-      [name]: draft.trim() || DEFAULT_SAMPLE,
-    }));
-    setEditing(null);
-  }
+  const { headings, body, caption } = typographyByCategory(profile);
+  const headingsSorted = [...headings].sort((a, b) => b.fontSizePx - a.fontSizePx);
+  const bodySorted = [...body].sort((a, b) => b.fontSizePx - a.fontSizePx);
+  const captionSorted = [...caption].sort((a, b) => b.fontSizePx - a.fontSizePx);
 
   return (
-    <div className="px-10 py-10 max-w-[1200px]">
-      <h1 className="text-h1 text-[var(--text-primary)]">Typography</h1>
-      <p className="mt-2 text-body-s text-[var(--text-secondary)] max-w-[640px]">
-        Fonts, weights, and type scale extracted from your repository.
-      </p>
-      <div className="mt-4 flex items-center gap-1.5">
-        <Sparkles
-          size={14}
-          strokeWidth={1.5}
-          className="text-[var(--text-tertiary)]"
+    <BrandTokenPageLayout
+      hero={
+        <BrandTokenPageHero
+          title="Typography"
+          description={BODY_LOREM}
+          icon={<Type size={20} strokeWidth={1.75} className="shrink-0" aria-hidden />}
         />
-        <span
-          className="text-[var(--text-tertiary)]"
-          style={{ fontFamily: "var(--font-geist-sans)", fontSize: 12 }}
-        >
-          Auto-extracted from {source}
-        </span>
-      </div>
+      }
+      metaRight={<LastUpdatedLabel scannedAt={profile.scannedAt} />}
+    >
+      <Tabs defaultValue="headings" className="w-full max-w-full">
+        <TabsList variant="pill" className="h-auto w-full max-w-md">
+          <TabsTrigger value="headings">Headings</TabsTrigger>
+          <TabsTrigger value="body">Body</TabsTrigger>
+          <TabsTrigger value="caption">Caption</TabsTrigger>
+        </TabsList>
 
-      {/* ── Section 1: Font Cards ── */}
-      {profile.fonts.length > 0 && (
-        <div className="mt-10">
-          <h2 className="text-h2 text-[var(--text-primary)] mb-6">
-            Font Families
-          </h2>
-          {profile.fonts.map((font) => (
-            <div
-              key={font.family}
-              className="rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-default)] p-6 mb-6"
-            >
-              {/* Family name in that font */}
-              <div
-                className="text-[var(--text-primary)] mb-2"
-                style={{
-                  fontFamily: `${font.family}, ${font.fallbacks.join(", ")}`,
-                  fontSize: 24,
-                  fontWeight: 600,
-                }}
-              >
-                {font.family}
-              </div>
-
-              {/* Label row */}
-              <div
-                className="text-[var(--text-secondary)] mb-3"
-                style={{ fontFamily: "var(--font-geist-sans)", fontSize: 13 }}
-              >
-                Imported via {font.importMethod} ·{" "}
-                CSS var {font.variable ?? "—"} ·{" "}
-                Display {font.displayStrategy ?? "swap"}
-              </div>
-
-              {/* Weight pills */}
-              {font.weights.length > 0 && (
-                <div className="flex flex-wrap gap-2 mb-4">
-                  {font.weights.map((w) => (
-                    <Badge
-                      key={w.value}
-                      variant="outline"
-                      style={{
-                        fontWeight: Number(w.value),
-                        fontFamily: font.family,
-                      }}
-                    >
-                      {w.value} · {w.name}
-                    </Badge>
-                  ))}
-                </div>
-              )}
-
-              {/* Charset preview */}
-              <div
-                className="text-[var(--text-secondary)] overflow-x-auto whitespace-nowrap pb-1"
-                style={{
-                  fontFamily: `${font.family}, ${font.fallbacks.join(", ")}`,
-                  fontSize: 20,
-                }}
-              >
-                ABCDEFGHIJKLMNOPQRSTUVWXYZ abcdefghijklmnopqrstuvwxyz
-                0123456789 !@#$%^&*
-              </div>
-
-              {/* Fallback stack */}
-              <div
-                className="text-[var(--text-tertiary)] mt-3"
-                style={{ fontFamily: "var(--font-geist-mono)", fontSize: 12 }}
-              >
-                Fallbacks: {font.fallbacks.join(", ")}
-              </div>
+        <TabsContent value="headings" className="mt-6 outline-none">
+          {headingsSorted.length === 0 ? (
+            <EmptyTabStrip>No heading or display tokens found for this repository.</EmptyTabStrip>
+          ) : (
+            <div className="grid w-full grid-cols-1 gap-4 sm:grid-cols-2">
+              {headingsSorted.map((t) => (
+                <TypographyContainerCard
+                  key={t.name + t.fontSizePx}
+                  eyebrow={t.name}
+                  sampleLabel={familyLabel(t.fontFamily)}
+                  displayText="Aa"
+                  previewAs="div"
+                  previewAriaLabel={`${t.name} typographic preview`}
+                  previewStyle={tokenPreviewStyle(t)}
+                  tabs={metricTabsForToken(t, tabIconProps)}
+                />
+              ))}
             </div>
-          ))}
-        </div>
-      )}
+          )}
+        </TabsContent>
 
-      {/* ── Section 2: Type Ladder ── */}
-      {sortedTypography.length > 0 && (
-        <div className="mt-10">
-          <h3
-            className="text-h3 text-[var(--text-primary)] mb-6 sticky top-0 py-4 z-10"
-            style={{ backgroundColor: "var(--bg-elevated)" }}
-          >
-            Type Ladder — all sizes at a glance
-          </h3>
+        <TabsContent value="body" className="mt-6 outline-none">
+          {bodySorted.length === 0 ? (
+            <EmptyTabStrip>No body tokens found for this repository.</EmptyTabStrip>
+          ) : (
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              {bodySorted.map((t) => (
+                <TypographyBodyCard
+                  key={t.name + t.fontSizePx}
+                  eyebrow={t.name}
+                  sampleLabel={familyLabel(t.fontFamily)}
+                  body={CARD_LOREM}
+                  bodyStyle={tokenPreviewStyle(t)}
+                  tabs={metricTabsForToken(t, tabIconProps)}
+                />
+              ))}
+            </div>
+          )}
+        </TabsContent>
 
-          {sortedTypography.map((type) => {
-            const isEditing = editing === type.name;
-            const sampleText = samples[type.name] ?? DEFAULT_SAMPLE;
-
-            return (
-              <div
-                key={type.name}
-                className="flex py-5 border-b border-[var(--border-subtle)] gap-6"
-              >
-                {/* Sample text */}
-                <div className="flex-1 min-w-0 overflow-hidden">
-                  {isEditing ? (
-                    <input
-                      autoFocus
-                      value={draft}
-                      onChange={(e) => setDraft(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") commitEdit(type.name);
-                        if (e.key === "Escape") setEditing(null);
-                      }}
-                      onBlur={() => commitEdit(type.name)}
-                      className="w-full bg-transparent outline-none border-b border-[var(--accent)] text-[var(--text-primary)] truncate"
-                      style={{
-                        fontSize: type.fontSize,
-                        fontWeight: type.fontWeightNumeric,
-                        fontFamily: type.fontFamily,
-                        lineHeight: type.lineHeight,
-                        letterSpacing: type.letterSpacing,
-                      }}
-                    />
-                  ) : (
-                    <p
-                      className="truncate text-[var(--text-primary)] cursor-text"
-                      title="Click to edit sample"
-                      onClick={() => startEdit(type.name)}
-                      style={{
-                        fontSize: type.fontSize,
-                        fontWeight: type.fontWeightNumeric,
-                        fontFamily: type.fontFamily,
-                        lineHeight: type.lineHeight,
-                        letterSpacing: type.letterSpacing,
-                      }}
-                    >
-                      {sampleText}
-                    </p>
-                  )}
-                </div>
-
-                {/* Spec block */}
-                <div
-                  className="w-full shrink-0 text-[var(--text-secondary)] space-y-0.5"
-                  style={{ fontFamily: "var(--font-geist-mono)", fontSize: 12 }}
-                >
-                  <div className="text-[var(--text-primary)] font-semibold">
-                    {type.name}
-                  </div>
-                  <div>
-                    Size {type.fontSizePx}px /{" "}
-                    {type.lineHeightPx ?? "—"}px
-                  </div>
-                  <div>Weight {type.fontWeightNumeric}</div>
-                  <div>
-                    Tracking {type.letterSpacing ?? "normal"}
-                  </div>
-                  <div>Family {type.fontFamily}</div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
+        <TabsContent value="caption" className="mt-6 outline-none">
+          {captionSorted.length === 0 ? (
+            <EmptyTabStrip>
+              No utility tokens mapped here yet. Caption styles use the{" "}
+              <span className="font-medium text-[var(--text-secondary)]">utility</span>{" "}
+              category from your scan.
+            </EmptyTabStrip>
+          ) : (
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              {captionSorted.map((t) => (
+                <TypographyBodyCard
+                  key={t.name + t.fontSizePx}
+                  eyebrow={t.name}
+                  sampleLabel={familyLabel(t.fontFamily)}
+                  body={CARD_LOREM}
+                  bodyStyle={tokenPreviewStyle(t)}
+                  tabs={metricTabsForToken(t, tabIconProps)}
+                />
+              ))}
+            </div>
+          )}
+        </TabsContent>
+      </Tabs>
+    </BrandTokenPageLayout>
   );
 }

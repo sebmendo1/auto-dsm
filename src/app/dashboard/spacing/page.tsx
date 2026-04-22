@@ -1,30 +1,46 @@
 "use client";
 
 import * as React from "react";
-import { Sparkles } from "lucide-react";
+import { UnfoldVertical } from "lucide-react";
 import { useBrandStore } from "@/stores/brand";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
+import {
+  BrandTokenPageHero,
+  BrandTokenPageLayout,
+  LastUpdatedLabel,
+  TokenPageProvenanceLine,
+} from "@/components/dashboard/brand-token-page-layout";
+import { brandTokenSurface } from "@/components/ui/brand-card-tokens";
+import { cn } from "@/lib/utils";
 import type { BrandSpacing } from "@/lib/brand/types";
+
+const HERO_DESC =
+  "The spacing scale used for padding, margin, and gaps—extracted from your repository.";
 
 export default function SpacingPage() {
   const profile = useBrandStore((s) => s.profile);
 
   if (!profile || profile.spacing.length === 0) {
     return (
-      <div className="px-10 py-10 max-w-[1200px]">
-        <h1 className="text-h1 text-[var(--text-primary)]">Spacing</h1>
-        <p className="mt-2 text-body-s text-[var(--text-secondary)] max-w-[640px]">
-          The spacing scale used for padding, margin, and gaps.
-        </p>
-        <div className="mt-10">
-          <EmptyState
-            title="No spacing detected"
-            description="We didn't find any spacing tokens in this repo's source files."
+      <BrandTokenPageLayout
+        hero={
+          <BrandTokenPageHero
+            title="Spacing"
+            description={HERO_DESC}
+            icon={
+              <UnfoldVertical size={20} strokeWidth={1.75} className="shrink-0" aria-hidden />
+            }
           />
-        </div>
-      </div>
+        }
+        metaRight={profile?.scannedAt ? <LastUpdatedLabel scannedAt={profile.scannedAt} /> : undefined}
+      >
+        <EmptyState
+          title="No spacing detected"
+          description="We didn't find any spacing tokens in this repo's source files."
+        />
+      </BrandTokenPageLayout>
     );
   }
 
@@ -47,35 +63,37 @@ export default function SpacingPage() {
   const sp2 = spacingMap["2"] ?? sorted[Math.min(1, sorted.length - 1)];
 
   return (
-    <div className="px-10 py-10 max-w-[1200px]">
-      <h1 className="text-h1 text-[var(--text-primary)]">Spacing</h1>
-      <p className="mt-2 text-body-s text-[var(--text-secondary)] max-w-[640px]">
-        The spacing scale used for padding, margin, and gaps.
-      </p>
-      <div className="mt-4 flex items-center gap-1.5">
-        <Sparkles
-          size={14}
-          strokeWidth={1.5}
-          className="text-[var(--text-tertiary)]"
+    <BrandTokenPageLayout
+      hero={
+        <BrandTokenPageHero
+          title="Spacing"
+          description={HERO_DESC}
+          icon={
+            <UnfoldVertical size={20} strokeWidth={1.75} className="shrink-0" aria-hidden />
+          }
         />
-        <span
-          className="text-[var(--text-tertiary)]"
-          style={{ fontFamily: "var(--font-geist-sans)", fontSize: 12 }}
-        >
-          Auto-extracted from {source}
-        </span>
-      </div>
+      }
+      metaRight={<LastUpdatedLabel scannedAt={profile.scannedAt} />}
+    >
+      <div className="space-y-6">
+        <TokenPageProvenanceLine>Auto-extracted from {source}</TokenPageProvenanceLine>
 
+        <div className="space-y-10">
       {/* ── Section 1: Spacing Ladder ── */}
-      <div className="mt-10">
+      <div>
         <h2 className="text-h2 text-[var(--text-primary)] mb-6">
           Spacing Scale
         </h2>
-        <div>
+        <div
+          className={cn(
+            brandTokenSurface,
+            "divide-y divide-[var(--border-subtle)] overflow-hidden border border-[var(--border-subtle)]",
+          )}
+        >
           {sorted.map((s) => (
             <div
               key={s.name}
-              className="flex py-3 border-b border-[var(--border-subtle)] items-center gap-6"
+              className="flex items-center gap-6 px-4 py-3"
             >
               {/* Left: spec */}
               <div className="w-[140px] shrink-0">
@@ -125,13 +143,13 @@ export default function SpacingPage() {
       </div>
 
       {/* ── Section 2: Applied Examples ── */}
-      <div className="mt-12">
+      <div>
         <h2 className="text-h2 text-[var(--text-primary)] mb-6">
           Applied Examples
         </h2>
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           {/* Box A: padding demo */}
-          <div className="bg-[var(--bg-tertiary)] border border-[var(--border-default)] rounded-xl p-6">
+          <div className={cn(brandTokenSurface, "p-6")}>
             <div
               className="text-[var(--text-tertiary)] mb-3"
               style={{ fontFamily: "var(--font-geist-mono)", fontSize: 11 }}
@@ -153,7 +171,7 @@ export default function SpacingPage() {
           </div>
 
           {/* Box B: gap demo */}
-          <div className="bg-[var(--bg-tertiary)] border border-[var(--border-default)] rounded-xl p-6">
+          <div className={cn(brandTokenSurface, "p-6")}>
             <div
               className="text-[var(--text-tertiary)] mb-3"
               style={{ fontFamily: "var(--font-geist-mono)", fontSize: 11 }}
@@ -182,7 +200,7 @@ export default function SpacingPage() {
           </div>
 
           {/* Box C: button padding demo */}
-          <div className="bg-[var(--bg-tertiary)] border border-[var(--border-default)] rounded-xl p-6">
+          <div className={cn(brandTokenSurface, "p-6")}>
             <div
               className="text-[var(--text-tertiary)] mb-3"
               style={{ fontFamily: "var(--font-geist-mono)", fontSize: 11 }}
@@ -210,6 +228,8 @@ export default function SpacingPage() {
           </div>
         </div>
       </div>
-    </div>
+        </div>
+      </div>
+    </BrandTokenPageLayout>
   );
 }

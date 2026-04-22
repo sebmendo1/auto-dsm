@@ -1,54 +1,68 @@
 "use client";
 
 import * as React from "react";
-import { Sparkles } from "lucide-react";
+import { Paintbrush } from "lucide-react";
 import { useBrandStore } from "@/stores/brand";
 import { CopyButton } from "@/components/ui/copy-button";
 import { EmptyState } from "@/components/ui/empty-state";
+import {
+  BrandTokenPageHero,
+  BrandTokenPageLayout,
+  LastUpdatedLabel,
+  TokenPageProvenanceLine,
+} from "@/components/dashboard/brand-token-page-layout";
+import { brandTokenSurface } from "@/components/ui/brand-card-tokens";
+import { cn } from "@/lib/utils";
+
+const HERO_DESC =
+  "Gradients extracted from your theme. Each card shows the preview, color stops, and CSS value.";
 
 export default function GradientsPage() {
   const profile = useBrandStore((s) => s.profile);
 
   if (!profile || profile.gradients.length === 0) {
     return (
-      <div className="px-10 py-10 max-w-[1200px]">
-        <h1 className="text-h1 text-[var(--text-primary)]">Gradients</h1>
-        <p className="mt-2 text-body-s text-[var(--text-secondary)] max-w-[640px]">
-          Gradient definitions used throughout your UI.
-        </p>
-        <div className="mt-10">
-          <EmptyState
-            title="No gradients detected"
-            description="We didn't find any gradient tokens in this repo's CSS or config."
+      <BrandTokenPageLayout
+        hero={
+          <BrandTokenPageHero
+            title="Gradients"
+            description="Gradient definitions used throughout your UI."
+            icon={
+              <Paintbrush size={20} strokeWidth={1.75} className="shrink-0" aria-hidden />
+            }
           />
-        </div>
-      </div>
+        }
+        metaRight={profile?.scannedAt ? <LastUpdatedLabel scannedAt={profile.scannedAt} /> : undefined}
+      >
+        <EmptyState
+          title="No gradients detected"
+          description="We didn't find any gradient tokens in this repo's CSS or config."
+        />
+      </BrandTokenPageLayout>
     );
   }
 
   const source = profile.meta.cssSource || profile.meta.tailwindConfigPath || "repo";
 
   return (
-    <div className="px-10 py-10 max-w-[1200px]">
-      <h1 className="text-h1 text-[var(--text-primary)]">Gradients</h1>
-      <p className="mt-2 text-body-s text-[var(--text-secondary)] max-w-[640px]">
-        Gradients extracted from your theme. Each card shows the preview, stops, and CSS value.
-      </p>
-      <div className="mt-4 flex items-center gap-1.5">
-        <Sparkles size={14} strokeWidth={1.5} className="text-[var(--text-tertiary)]" />
-        <span
-          className="text-[var(--text-tertiary)]"
-          style={{ fontFamily: "var(--font-geist-sans)", fontSize: 12 }}
-        >
-          Auto-extracted from {source}
-        </span>
-      </div>
+    <BrandTokenPageLayout
+      hero={
+        <BrandTokenPageHero
+          title="Gradients"
+          description={HERO_DESC}
+          icon={<Paintbrush size={20} strokeWidth={1.75} className="shrink-0" aria-hidden />}
+        />
+      }
+      metaRight={<LastUpdatedLabel scannedAt={profile.scannedAt} />}
+    >
+      <div className="space-y-6">
+        <TokenPageProvenanceLine>Auto-extracted from {source}</TokenPageProvenanceLine>
 
-      <div className="mt-10 grid grid-cols-1 md:grid-cols-2 gap-5">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         {profile.gradients.map((g, i) => (
           <div
             key={`${g.name}-${i}`}
-            className="rounded-xl border border-[var(--border-default)] bg-[var(--bg-elevated)] overflow-hidden"
+            className={cn(brandTokenSurface, "overflow-hidden")}
           >
             <div
               className="h-36 w-full"
@@ -107,7 +121,8 @@ export default function GradientsPage() {
             </div>
           </div>
         ))}
+        </div>
       </div>
-    </div>
+    </BrandTokenPageLayout>
   );
 }

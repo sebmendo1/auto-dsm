@@ -1,28 +1,48 @@
 "use client";
 
 import * as React from "react";
-import { Sparkles } from "lucide-react";
+import { RectangleHorizontal } from "lucide-react";
 import { useBrandStore } from "@/stores/brand";
 import { CopyButton } from "@/components/ui/copy-button";
 import { EmptyState } from "@/components/ui/empty-state";
+import {
+  BrandTokenPageHero,
+  BrandTokenPageLayout,
+  LastUpdatedLabel,
+  TokenPageProvenanceLine,
+} from "@/components/dashboard/brand-token-page-layout";
+import { brandTokenSurface } from "@/components/ui/brand-card-tokens";
+import { cn } from "@/lib/utils";
+
+const HERO_DESC = "Border widths, styles, and colors used in your UI—extracted from your repository.";
 
 export default function BordersPage() {
   const profile = useBrandStore((s) => s.profile);
 
   if (!profile || profile.borders.length === 0) {
     return (
-      <div className="px-10 py-10 max-w-[1200px]">
-        <h1 className="text-h1 text-[var(--text-primary)]">Borders</h1>
-        <p className="mt-2 text-body-s text-[var(--text-secondary)] max-w-[640px]">
-          Border widths, styles, and colors used in your UI.
-        </p>
-        <div className="mt-10">
-          <EmptyState
-            title="No borders detected"
-            description="We didn't find any border tokens in this repo's source files."
+      <BrandTokenPageLayout
+        hero={
+          <BrandTokenPageHero
+            title="Borders"
+            description={HERO_DESC}
+            icon={
+              <RectangleHorizontal
+                size={20}
+                strokeWidth={1.75}
+                className="shrink-0"
+                aria-hidden
+              />
+            }
           />
-        </div>
-      </div>
+        }
+        metaRight={profile?.scannedAt ? <LastUpdatedLabel scannedAt={profile.scannedAt} /> : undefined}
+      >
+        <EmptyState
+          title="No borders detected"
+          description="We didn't find any border tokens in this repo's source files."
+        />
+      </BrandTokenPageLayout>
     );
   }
 
@@ -32,26 +52,27 @@ export default function BordersPage() {
     "repo";
 
   return (
-    <div className="px-10 py-10 max-w-[1200px]">
-      <h1 className="text-h1 text-[var(--text-primary)]">Borders</h1>
-      <p className="mt-2 text-body-s text-[var(--text-secondary)] max-w-[640px]">
-        Border widths, styles, and colors used in your UI.
-      </p>
-      <div className="mt-4 flex items-center gap-1.5">
-        <Sparkles
-          size={14}
-          strokeWidth={1.5}
-          className="text-[var(--text-tertiary)]"
+    <BrandTokenPageLayout
+      hero={
+        <BrandTokenPageHero
+          title="Borders"
+          description={HERO_DESC}
+          icon={
+            <RectangleHorizontal
+              size={20}
+              strokeWidth={1.75}
+              className="shrink-0"
+              aria-hidden
+            />
+          }
         />
-        <span
-          className="text-[var(--text-tertiary)]"
-          style={{ fontFamily: "var(--font-geist-sans)", fontSize: 12 }}
-        >
-          Auto-extracted from {source}
-        </span>
-      </div>
+      }
+      metaRight={<LastUpdatedLabel scannedAt={profile.scannedAt} />}
+    >
+      <div className="space-y-6">
+        <TokenPageProvenanceLine>Auto-extracted from {source}</TokenPageProvenanceLine>
 
-      <div className="mt-10 space-y-0">
+        <div className="space-y-0">
         {profile.borders.map((border, i) => {
           const borderCss = `${border.width} ${border.style} ${border.color}`;
           return (
@@ -61,7 +82,10 @@ export default function BordersPage() {
             >
               {/* Preview card */}
               <div
-                className="w-24 h-16 rounded-xl bg-[var(--bg-elevated)] shrink-0 flex items-center justify-center"
+                className={cn(
+                  brandTokenSurface,
+                  "h-16 w-24 shrink-0 flex items-center justify-center",
+                )}
                 style={{
                   border: `${border.width} ${border.style} ${border.color}`,
                 }}
@@ -160,7 +184,8 @@ export default function BordersPage() {
             </div>
           );
         })}
+        </div>
       </div>
-    </div>
+    </BrandTokenPageLayout>
   );
 }
