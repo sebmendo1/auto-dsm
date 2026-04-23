@@ -37,7 +37,7 @@ export function PublicTopNav({
       <div className="flex h-full items-center gap-6 px-6">
         {/* Left: wordmark */}
         <Link
-          href="/"
+          href="/login"
           className="flex items-center gap-2 shrink-0 text-[var(--text-primary)] min-w-0"
         >
           <ProductWordmark width={110} priority />

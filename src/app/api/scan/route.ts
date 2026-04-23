@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { normalizeRepoInput } from "@/lib/utils";
 import {
+  type GitHubFetchOptions,
   fetchRepoMeta,
   fetchTree,
   fetchFileText,
@@ -66,22 +67,64 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   }
 
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  const ghOpts: GitHubFetchOptions = {
+    userAccessToken: session?.provider_token ?? null,
+  };
+
+  const scanLog = (event: string, fields?: Record<string, string | undefined>) => {
+    if (process.env.NODE_ENV === "development") {
+      console.info("[scan]", event, fields ?? "");
+    } else {
+      const safe = { event, ...fields };
+      console.info(`[scan] ${JSON.stringify(safe)}`);
+    }
+  };
+
+  const markScanError = async (message: string) => {
+    await supabase.from("user_onboarding").upsert(
+      { user_id: user.id, last_scan_error: message.slice(0, 500) },
+      { onConflict: "user_id" },
+    );
+  };
+
+  await supabase.from("user_onboarding").upsert(
+    {
+      user_id: user.id,
+      last_scan_started_at: new Date().toISOString(),
+      last_scan_error: null,
+      current_step: "scanning",
+    },
+    { onConflict: "user_id" },
+  );
+
   // ── 1. Repo meta ───────────────────────────────────────────────────────────
-  const meta = await fetchRepoMeta(owner, name);
+  const meta = await fetchRepoMeta(owner, name, ghOpts);
   if (!meta) {
+    scanLog("meta_failed", { reason: "not_accessible" });
+    await markScanError(
+      "Repository not found or not accessible. For private repos, sign in with GitHub (OAuth) or ensure the repo exists.",
+    );
     return NextResponse.json(
-      { error: "Repository not found or not accessible." },
+      {
+        error:
+          "Repository not found or not accessible. If it is private, use Continue with GitHub and grant repo access.",
+        errorCode: "repo_inaccessible",
+      },
       { status: 404 },
     );
   }
 
   // ── 2. Tree ────────────────────────────────────────────────────────────────
-  const rawTree = await fetchTree(owner, name, meta.sha);
+  const rawTree = await fetchTree(owner, name, meta.sha, ghOpts);
   const tree: TreeEntry[] = rawTree.map((t) => ({
     path: t.path,
     size: t.size,
   }));
   if (tree.length === 0) {
+    await markScanError("Repository tree is empty or inaccessible.");
     return NextResponse.json(
       { error: "Repository tree is empty or inaccessible." },
       { status: 500 },
@@ -110,8 +153,10 @@ export async function POST(req: NextRequest) {
     name,
     pkgJsonEntry.path,
     meta.sha,
+    ghOpts,
   );
   if (!pkgSource) {
+    await markScanError("Could not read package.json.");
     return NextResponse.json(
       { error: "Could not read package.json." },
       { status: 500 },
@@ -161,7 +206,7 @@ export async function POST(req: NextRequest) {
     /(^|\/)tailwind\.config\.(ts|js|cjs|mjs)$/.test(e.path),
   );
   const tailwindConfigSource = tailwindEntry
-    ? (await fetchFileText(owner, name, tailwindEntry.path, meta.sha)) ??
+    ? (await fetchFileText(owner, name, tailwindEntry.path, meta.sha, ghOpts)) ??
       undefined
     : undefined;
 
@@ -181,7 +226,7 @@ export async function POST(req: NextRequest) {
 
   const cssSources: Array<{ path: string; content: string }> = [];
   for (const entry of cssEntries) {
-    const content = await fetchFileText(owner, name, entry.path, meta.sha);
+    const content = await fetchFileText(owner, name, entry.path, meta.sha, ghOpts);
     if (content) cssSources.push({ path: entry.path, content });
   }
 
@@ -190,7 +235,7 @@ export async function POST(req: NextRequest) {
     (e) => e.path === "components.json" || e.path.endsWith("/components.json"),
   );
   const shadcnJson = shadcnEntry
-    ? (await fetchFileText(owner, name, shadcnEntry.path, meta.sha)) ??
+    ? (await fetchFileText(owner, name, shadcnEntry.path, meta.sha, ghOpts)) ??
       undefined
     : undefined;
 
@@ -204,7 +249,7 @@ export async function POST(req: NextRequest) {
     .slice(0, MAX_LAYOUT_FILES);
   const layoutFiles: FontFileInput[] = [];
   for (const entry of layoutCandidates) {
-    const content = await fetchFileText(owner, name, entry.path, meta.sha);
+    const content = await fetchFileText(owner, name, entry.path, meta.sha, ghOpts);
     if (content) layoutFiles.push({ path: entry.path, content });
   }
 
@@ -225,7 +270,7 @@ export async function POST(req: NextRequest) {
 
   const assetFiles: AssetFile[] = [];
   for (const entry of assetCandidates) {
-    const buf = await fetchFileBuffer(owner, name, entry.path, meta.sha);
+    const buf = await fetchFileBuffer(owner, name, entry.path, meta.sha, ghOpts);
     if (buf) assetFiles.push({ path: entry.path, buffer: buf });
   }
 
@@ -260,7 +305,8 @@ export async function POST(req: NextRequest) {
     };
   } catch (e) {
     const message = e instanceof Error ? e.message : "Unknown error";
-    console.error("[scan] buildBrandProfile failed:", message);
+    scanLog("extraction_failed", { reason: message.slice(0, 120) });
+    await markScanError(`Extraction failed: ${message.slice(0, 300)}`);
     return NextResponse.json(
       { error: `Extraction failed: ${message}` },
       { status: 500 },
@@ -296,12 +342,19 @@ export async function POST(req: NextRequest) {
   );
 
   if (upsertErr) {
-    console.error("[scan] DB upsert failed:", upsertErr.message);
+    scanLog("db_upsert_failed", { reason: upsertErr.message });
+    await markScanError(upsertErr.message);
     return NextResponse.json(
       { error: `Save failed: ${upsertErr.message}` },
       { status: 500 },
     );
   }
+
+  await supabase.from("user_onboarding").upsert(
+    { user_id: user.id, last_scan_error: null },
+    { onConflict: "user_id" },
+  );
+  scanLog("completed", { owner, name });
 
   return NextResponse.json({ status: "completed", owner, name });
 }

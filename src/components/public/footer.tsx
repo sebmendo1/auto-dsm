@@ -9,15 +9,15 @@ export function PublicFooter() {
     <footer className="border-t border-[var(--border-subtle)] py-12 mt-16">
       <div className="flex flex-col items-center gap-5">
         <Link
-          href="/"
-          aria-label="Perplexity Computer — home"
+          href="/login"
+          aria-label="autoDSM — sign in"
           className="inline-flex items-center text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] transition-colors duration-150 [transition-timing-function:var(--ease-standard)]"
         >
           <ProductWordmark width={100} />
         </Link>
 
         <Link
-          href="/"
+          href="/login"
           className="inline-flex items-center gap-1.5 rounded-full bg-[var(--accent)] text-[var(--accent-fg)] hover:bg-[var(--accent-hover)] px-5 py-2.5 transition-colors duration-150 [transition-timing-function:var(--ease-standard)]"
           style={{
             fontFamily: "var(--font-geist-sans)",

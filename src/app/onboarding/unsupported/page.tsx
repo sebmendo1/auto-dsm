@@ -64,7 +64,7 @@ function UnsupportedPageInner() {
               placeholder="you@company.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="h-11"
+              className="h-11 bg-[var(--bg-secondary)]"
             />
             <Button type="submit" size="lg" disabled={loading}>
               {loading ? "Submitting…" : "Notify me"}

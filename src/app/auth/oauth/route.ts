@@ -43,10 +43,10 @@ export async function GET(request: NextRequest) {
     provider,
     options: {
       redirectTo,
-      // public_repo: list repos via GET /user/repos; read:user + email for profile
+      // repo: list + read private content; read:user + email for profile
       scopes:
         provider === "github"
-          ? "read:user user:email public_repo"
+          ? "read:user user:email repo"
           : undefined,
     },
   });

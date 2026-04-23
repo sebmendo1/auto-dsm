@@ -4,12 +4,15 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { ProductIcon } from "@/components/brand/product-mark";
+import { getAuthBridgePath } from "@/lib/auth/bridge-redirect";
+import { isProfileCompleted, type UserOnboardingRow } from "@/lib/onboarding/user-onboarding-mapper";
 
 /**
  * Client-side hop after OAuth. Reads sessionStorage pending repo and routes:
  *   1. If pending repo → /onboarding/scanning?repo=<slug>
- *   2. Else check DB for existing repo → /dashboard
- *   3. Else → /onboarding
+ *   2. Else if brand_repos row → /dashboard
+ *   3. Else if user_onboarding.profile_completed_at → /onboarding/connect
+ *   4. Else → /onboarding/welcome
  */
 export default function AuthBridge() {
   const router = useRouter();
@@ -26,21 +29,30 @@ export default function AuthBridge() {
         // ignore
       }
 
-      if (pending) {
-        router.replace(`/onboarding/scanning?repo=${encodeURIComponent(pending)}`);
-        return;
-      }
-
       const supabase = createClient();
       const {
         data: { user },
       } = await supabase.auth.getUser();
       if (!user) {
-        router.replace("/login");
+        if (!cancelled) router.replace("/login");
         return;
       }
 
-      const { data } = await supabase
+      if (pending) {
+        if (!cancelled) {
+          router.replace(
+            getAuthBridgePath({
+              hasPendingRepo: true,
+              pendingRepo: pending,
+              hasBrandRepo: false,
+              profileCompleted: false,
+            }),
+          );
+        }
+        return;
+      }
+
+      const { data: brandRow } = await supabase
         .from("brand_repos")
         .select("owner,name")
         .eq("user_id", user.id)
@@ -48,8 +60,22 @@ export default function AuthBridge() {
         .limit(1)
         .maybeSingle();
 
+      const { data: onboardRow } = await supabase
+        .from("user_onboarding")
+        .select("profile_completed_at")
+        .eq("user_id", user.id)
+        .maybeSingle();
+
       if (cancelled) return;
-      router.replace(data ? "/dashboard" : "/onboarding");
+      const path = getAuthBridgePath({
+        hasPendingRepo: false,
+        pendingRepo: null,
+        hasBrandRepo: Boolean(brandRow),
+        profileCompleted: isProfileCompleted(
+          onboardRow as Pick<UserOnboardingRow, "profile_completed_at"> | null,
+        ),
+      });
+      router.replace(path);
     })();
 
     return () => {

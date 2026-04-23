@@ -2,6 +2,24 @@
 
 Use this checklist so the **contribute build** on Vercel uses **`brand-book-v1`** and **Supabase Auth (GitHub OAuth)** works end-to-end.
 
+## 0. Official project and local fix for `requireSupabasePublicConfig`
+
+| Item | Value |
+|------|--------|
+| **Git remote (this clone)** | `sebmendo1/auto-dsm` (see `git remote -v`) |
+| **Official Supabase project (Option A: reuse existing)** | **ref** `mujlucfkoqvghvdikkhw` — URL `https://mujlucfkoqvghvdikkhw.supabase.co` |
+| **Cursor Supabase MCP** | Repo [`.cursor/mcp.json`](../.cursor/mcp.json) must use the same `project_ref` as this URL if you work with a different project, update both. |
+
+`DashboardLayout` calls `createClient()` which requires **`NEXT_PUBLIC_SUPABASE_URL` (or `SUPABASE_URL`) and a public key** at runtime. Without them, the app throws. Fix: copy [`.env.example`](../.env.example) to **`.env.local`**, set URL + **publishable** or **anon** key from Supabase **Project Settings → API**, and `NEXT_PUBLIC_APP_URL=http://localhost:3000` for local dev. **Redeploy** after changing Vercel env. MCP config does *not* inject env into Next.js.
+
+**Manual (dashboard) — must match your team**
+
+1. [Vercel](https://vercel.com) → project **`autodsm`**: connect **`sebmendo1/auto-dsm`**, set env vars in **Settings → Environment Variables** (see §3), then **Redeploy** Production/Preview.
+2. [Supabase](https://supabase.com/dashboard) project **`mujlucfkoqvghvdikkhw`**: **Authentication → URL Configuration** and **Providers** (see §4), including GitHub OAuth app callback to `https://mujlucfkoqvghvdikkhw.supabase.co/auth/v1/callback`.
+3. Open **Cursor** → sign in to the Supabase MCP the first time it is used (browser), so AI tools can query the linked project.
+
+4. (Optional) Supabase **agent skills** for Cursor are installed under [`.agents/skills/`](../.agents/skills/) for this repo (`npx skills add supabase/agent-skills`). Add that folder to version control or ignore it per your team’s preference.
+
 ## 1. Git ↔ Vercel (source of truth)
 
 | Check | Action |

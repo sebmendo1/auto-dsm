@@ -414,6 +414,58 @@ svg.lucide {
   animation: autodsm-indeterminate 1.6s linear infinite;
 }
 
+/* Onboarding scan: LLM-style gradient wave across the active token icon */
+@keyframes autodsm-scan-sheen {
+  0% {
+    transform: translateX(-100%) skewX(-12deg);
+  }
+  100% {
+    transform: translateX(280%) skewX(-12deg);
+  }
+}
+.autodsm-scan-sheen {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: inherit;
+}
+.autodsm-scan-sheen::after {
+  content: "";
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  left: 0;
+  width: 45%;
+  min-width: 2rem;
+  background: linear-gradient(
+    100deg,
+    transparent 0%,
+    color-mix(in srgb, var(--accent) 8%, transparent) 20%,
+    color-mix(in srgb, var(--accent) 45%, transparent) 50%,
+    color-mix(in srgb, var(--accent) 8%, transparent) 80%,
+    transparent 100%
+  );
+  animation: autodsm-scan-sheen 1.25s ease-in-out infinite;
+  border-radius: inherit;
+}
+html.light .autodsm-scan-sheen::after {
+  background: linear-gradient(
+    100deg,
+    transparent 0%,
+    color-mix(in srgb, var(--accent) 18%, var(--bg-elevated)) 25%,
+    color-mix(in srgb, var(--accent) 35%, #ffffff) 50%,
+    color-mix(in srgb, var(--accent) 18%, var(--bg-elevated)) 75%,
+    transparent 100%
+  );
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .autodsm-scan-sheen::after {
+    animation: none;
+  }
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
