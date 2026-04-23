@@ -33,6 +33,8 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+-- Idempotent: safe to re-run (e.g. SQL Editor) without duplicate trigger errors
+DROP TRIGGER IF EXISTS "user_onboarding_set_updated_at" ON "public"."user_onboarding";
 CREATE TRIGGER "user_onboarding_set_updated_at"
   BEFORE UPDATE ON "public"."user_onboarding"
   FOR EACH ROW
@@ -50,6 +52,7 @@ END;
 $$ LANGUAGE "plpgsql" SECURITY DEFINER
 SET "search_path" TO 'public';
 
+DROP TRIGGER IF EXISTS "app_users_ensure_onboarding" ON "public"."app_users";
 CREATE TRIGGER "app_users_ensure_onboarding"
   AFTER INSERT ON "public"."app_users"
   FOR EACH ROW
@@ -65,6 +68,9 @@ ON CONFLICT ("user_id") DO NOTHING;
 
 ALTER TABLE "public"."user_onboarding" ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "user_onboarding_select_own" ON "public"."user_onboarding";
+DROP POLICY IF EXISTS "user_onboarding_insert_own" ON "public"."user_onboarding";
+DROP POLICY IF EXISTS "user_onboarding_update_own" ON "public"."user_onboarding";
 CREATE POLICY "user_onboarding_select_own" ON "public"."user_onboarding"
   FOR SELECT
   TO "authenticated"

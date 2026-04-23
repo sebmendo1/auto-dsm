@@ -13,6 +13,14 @@ const PER_PAGE = 100;
  */
 export async function GET() {
   const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+  }
+
   const {
     data: { session },
   } = await supabase.auth.getSession();

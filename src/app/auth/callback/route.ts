@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+import { createRouteHandlerClient } from "@/lib/supabase/route-handler-client";
 import { NextResponse, type NextRequest } from "next/server";
 
 /**
@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
 
   if (!code) return NextResponse.redirect(`${origin}/login`);
 
-  const supabase = await createClient();
+  const supabase = await createRouteHandlerClient();
   const { error } = await supabase.auth.exchangeCodeForSession(code);
   if (error) {
     return NextResponse.redirect(
